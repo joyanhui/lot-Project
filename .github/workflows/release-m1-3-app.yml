@@ -77,8 +77,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bunx tauri build --target deb
-          bunx tauri build --target appimage
+          bunx tauri build --bundles deb
+          bunx tauri build --bundles appimage
 
       - name: Collect artifacts
         id: collect
@@ -150,7 +150,8 @@ jobs:
       - name: Build Tauri app
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri build --target msi
+        run: |
+          bunx tauri build --bundles msi
 
       - name: Collect artifacts
         shell: bash
@@ -219,7 +220,8 @@ jobs:
       - name: Build Tauri app
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri build --target dmg
+        run: |
+          bunx tauri build --bundles dmg
 
       - name: Collect artifacts
         shell: bash
@@ -416,7 +418,7 @@ jobs:
           set -euo pipefail
           project="$(find src-tauri/gen/apple -maxdepth 2 -name '*.xcodeproj' | head -1)"
           test -n "${project}"
-          scheme="$(xcodebuild -list -project "${project}" | awk '/Schemes:/{getline; gsub(/^ +| +$/, \"\"); print; exit}')"
+          scheme="$(xcodebuild -list -project "${project}" | awk '/Schemes:/{getline; gsub(/^ +| +$/, ""); print; exit}')"
           test -n "${scheme}"
           echo "project=${project}" >> "$GITHUB_OUTPUT"
           echo "scheme=${scheme}" >> "$GITHUB_OUTPUT"
