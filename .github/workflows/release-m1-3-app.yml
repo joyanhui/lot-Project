@@ -1,0 +1,145 @@
+name: Release M1-3 App
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "lot-manager-aio ref to build"
+        required: false
+        default: "main"
+      release_tag:
+        description: "Release tag/name"
+        required: false
+        default: "m1-3-app-manual"
+      prerelease:
+        description: "Mark release as prerelease"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-m1-3-app-${{ github.event.inputs.release_tag }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - name: Checkout lot-Project
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Apple targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install
+
+      - name: Build shared frontend for tauri
+        working-directory: workspace/m1-1-platform/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run build:tauri
+
+      - name: Initialize iOS project
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          bunx tauri ios init --ci --skip-targets-install
+
+      - name: Resolve Xcode project and scheme
+        id: xcode
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$(find src-tauri/gen/apple -maxdepth 2 -name '*.xcodeproj' | head -1)"
+          test -n "${project}"
+          scheme="$(xcodebuild -list -project "${project}" | awk '/Schemes:/{getline; gsub(/^ +| +$/, \"\"); print; exit}')"
+          test -n "${scheme}"
+          echo "project=${project}" >> "$GITHUB_OUTPUT"
+          echo "scheme=${scheme}" >> "$GITHUB_OUTPUT"
+
+      - name: Build unsigned simulator .app
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/m1-3-app-ios-build
+          xcodebuild \
+            -project "${{ steps.xcode.outputs.project }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath /tmp/m1-3-app-ios-build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package .app into .app.ipa
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="$(find /tmp/m1-3-app-ios-build/Build/Products -type d -name '*.app' | head -1)"
+          test -n "${app_path}"
+          mkdir -p /tmp/release
+          cp -R "${app_path}" /tmp/release/
+          app_name="$(basename "${app_path}")"
+          base_name="${app_name%.app}"
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/${base_name}.app.ipa"
+          echo "app_path=${app_path}" >> "$GITHUB_OUTPUT"
+          echo "ipa_path=/tmp/release/${base_name}.app.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-3-app-ios-unsigned
+          path: |
+            /tmp/release/*.app
+            /tmp/release/*.app.ipa
+          if-no-files-found: error
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: |
+            /tmp/release/*.app.ipa
