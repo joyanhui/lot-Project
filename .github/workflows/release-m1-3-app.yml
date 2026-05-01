@@ -313,6 +313,14 @@ jobs:
         shell: bash
         run: bunx tauri android init --ci --skip-targets-install
 
+      - name: Copy bridge templates & configure signing
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run scripts/copy-mobile-bridges.ts android
+          bun run scripts/configure-android-signing.ts
+
       - name: Build Android APK
         working-directory: workspace/m1-3-app
         shell: bash
@@ -392,6 +400,13 @@ jobs:
         working-directory: workspace/m1-3-app
         shell: bash
         run: bunx tauri ios init --ci --skip-targets-install
+
+      - name: Copy bridge templates to iOS project
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run scripts/copy-mobile-bridges.ts ios
 
       - name: Resolve Xcode project and scheme
         id: xcode
