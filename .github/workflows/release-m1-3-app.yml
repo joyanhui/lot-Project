@@ -25,6 +25,326 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ──────────────────────────────────────────────
+  # Desktop: Linux
+  # ──────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - name: Checkout lot-Project
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build frontend for tauri
+        working-directory: workspace/m1-1-platform/frontend
+        shell: bash
+        run: bun run build:tauri
+
+      - name: Build Tauri app
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          bunx tauri build --target deb
+          bunx tauri build --target appimage
+
+      - name: Collect artifacts
+        id: collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          find workspace/m1-3-app/src-tauri/target/release/bundle -name '*.deb' -exec cp {} /tmp/release/ \;
+          find workspace/m1-3-app/src-tauri/target/release/bundle -name '*.AppImage' -exec cp {} /tmp/release/ \;
+          find workspace/m1-3-app/src-tauri/target/release/bundle -name '*.AppImage.tar.gz' -exec cp {} /tmp/release/ \;
+          ls -la /tmp/release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-3-app-linux
+          path: /tmp/release/*
+          if-no-files-found: warn
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: /tmp/release/*
+
+  # ──────────────────────────────────────────────
+  # Desktop: Windows
+  # ──────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - name: Checkout lot-Project
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build frontend for tauri
+        working-directory: workspace/m1-1-platform/frontend
+        shell: bash
+        run: bun run build:tauri
+
+      - name: Build Tauri app
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: bunx tauri build --target msi
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          find workspace/m1-3-app/src-tauri/target/release/bundle -name '*.msi' -exec cp {} /tmp/release/ \;
+          ls -la /tmp/release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-3-app-windows
+          path: /tmp/release/*
+          if-no-files-found: warn
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: /tmp/release/*
+
+  # ──────────────────────────────────────────────
+  # Desktop: macOS
+  # ──────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - name: Checkout lot-Project
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build frontend for tauri
+        working-directory: workspace/m1-1-platform/frontend
+        shell: bash
+        run: bun run build:tauri
+
+      - name: Build Tauri app
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: bunx tauri build --target dmg
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          find workspace/m1-3-app/src-tauri/target/release/bundle -name '*.dmg' -exec cp {} /tmp/release/ \;
+          ls -la /tmp/release/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-3-app-macos
+          path: /tmp/release/*
+          if-no-files-found: warn
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: /tmp/release/*
+
+  # ──────────────────────────────────────────────
+  # Android
+  # ──────────────────────────────────────────────
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+    steps:
+      - name: Checkout lot-Project
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Add Android targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
+          cargo install tauri-cli --version "^2" || true
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "ndk;27.0.12077973" --channel=0
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build frontend for tauri
+        working-directory: workspace/m1-1-platform/frontend
+        shell: bash
+        run: bun run build:tauri
+
+      - name: Initialize Android project
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: bunx tauri android init --ci --skip-targets-install
+
+      - name: Build Android APK
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: bunx tauri android build --target aarch64 --apk
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          find workspace/m1-3-app/src-tauri/gen/android -name '*.apk' -exec cp {} /tmp/release/ \;
+          ls -la /tmp/release/ || echo "No APK found"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m1-3-app-android
+          path: /tmp/release/*.apk
+          if-no-files-found: warn
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+          files: /tmp/release/*.apk
+
+  # ──────────────────────────────────────────────
+  # iOS
+  # ──────────────────────────────────────────────
   build-ios-unsigned:
     runs-on: macos-latest
     env:
@@ -61,23 +381,17 @@ jobs:
       - name: Install workspace dependencies
         working-directory: workspace
         shell: bash
-        run: |
-          set -euo pipefail
-          bun install
+        run: bun install
 
       - name: Build shared frontend for tauri
         working-directory: workspace/m1-1-platform/frontend
         shell: bash
-        run: |
-          set -euo pipefail
-          bun run build:tauri
+        run: bun run build:tauri
 
       - name: Initialize iOS project
         working-directory: workspace/m1-3-app
         shell: bash
-        run: |
-          set -euo pipefail
-          bunx tauri ios init --ci --skip-targets-install
+        run: bunx tauri ios init --ci --skip-targets-install
 
       - name: Resolve Xcode project and scheme
         id: xcode
