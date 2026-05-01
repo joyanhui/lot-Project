@@ -355,12 +355,19 @@ jobs:
   # ──────────────────────────────────────────────
   # iOS
   # ──────────────────────────────────────────────
-  build-ios-unsigned:
+  build-ios:
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+      IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      IOS_BUNDLE_IDENTIFIER: ${{ secrets.IOS_BUNDLE_IDENTIFIER }}
+      IOS_EXPORT_OPTIONS_BASE64: ${{ secrets.IOS_EXPORT_OPTIONS_BASE64 }}
     steps:
       - name: Checkout lot-Project
         uses: actions/checkout@v4
@@ -423,7 +430,71 @@ jobs:
           echo "project=${project}" >> "$GITHUB_OUTPUT"
           echo "scheme=${scheme}" >> "$GITHUB_OUTPUT"
 
+      - name: Detect iOS signing availability
+        id: ios_signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${IOS_CERTIFICATE_P12_BASE64}" ] && [ -n "${IOS_CERTIFICATE_PASSWORD}" ] && [ -n "${IOS_PROVISIONING_PROFILE_BASE64}" ] && [ -n "${IOS_KEYCHAIN_PASSWORD}" ] && [ -n "${IOS_TEAM_ID}" ] && [ -n "${IOS_BUNDLE_IDENTIFIER}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare iOS signing assets
+        if: steps.ios_signing.outputs.enabled == 'true'
+        shell: bash
+        working-directory: workspace/m1-3-app
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/m1-3-ios-signing /tmp/m1-3-app-ios-build /tmp/release
+          security create-keychain -p "${IOS_KEYCHAIN_PASSWORD}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${IOS_KEYCHAIN_PASSWORD}" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          printf '%s' "${IOS_CERTIFICATE_P12_BASE64}" | base64 --decode > /tmp/m1-3-ios-signing/certificate.p12
+          security import /tmp/m1-3-ios-signing/certificate.p12 -k build.keychain -P "${IOS_CERTIFICATE_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${IOS_KEYCHAIN_PASSWORD}" build.keychain
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "${IOS_PROVISIONING_PROFILE_BASE64}" | base64 --decode > /tmp/m1-3-ios-signing/profile.mobileprovision
+          cp /tmp/m1-3-ios-signing/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/m1-3-app.mobileprovision"
+          if [ -n "${IOS_EXPORT_OPTIONS_BASE64}" ]; then
+            printf '%s' "${IOS_EXPORT_OPTIONS_BASE64}" | base64 --decode > /tmp/m1-3-ios-signing/ExportOptions.plist
+          else
+            cp signing/ios/ExportOptions.plist /tmp/m1-3-ios-signing/ExportOptions.plist
+          fi
+          /usr/libexec/PlistBuddy -c "Set :teamID ${IOS_TEAM_ID}" /tmp/m1-3-ios-signing/ExportOptions.plist || /usr/libexec/PlistBuddy -c "Add :teamID string ${IOS_TEAM_ID}" /tmp/m1-3-ios-signing/ExportOptions.plist
+
+      - name: Build signed iOS archive
+        if: steps.ios_signing.outputs.enabled == 'true'
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project "${{ steps.xcode.outputs.project }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath /tmp/m1-3-app-ios-build/LotManager.xcarchive \
+            DEVELOPMENT_TEAM="${IOS_TEAM_ID}" \
+            PRODUCT_BUNDLE_IDENTIFIER="${IOS_BUNDLE_IDENTIFIER}" \
+            archive
+
+      - name: Export signed IPA
+        if: steps.ios_signing.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath /tmp/m1-3-app-ios-build/LotManager.xcarchive \
+            -exportOptionsPlist /tmp/m1-3-ios-signing/ExportOptions.plist \
+            -exportPath /tmp/release
+          ls -la /tmp/release/
+
       - name: Build unsigned simulator .app
+        if: steps.ios_signing.outputs.enabled != 'true'
         working-directory: workspace/m1-3-app
         shell: bash
         run: |
@@ -441,7 +512,8 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build
 
-      - name: Package .app into .app.ipa
+      - name: Package simulator app bundle
+        if: steps.ios_signing.outputs.enabled != 'true'
         id: package
         shell: bash
         run: |
@@ -452,17 +524,18 @@ jobs:
           cp -R "${app_path}" /tmp/release/
           app_name="$(basename "${app_path}")"
           base_name="${app_name%.app}"
-          ditto -c -k --keepParent "${app_path}" "/tmp/release/${base_name}.app.ipa"
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/${base_name}-ios-simulator.app.zip"
           echo "app_path=${app_path}" >> "$GITHUB_OUTPUT"
-          echo "ipa_path=/tmp/release/${base_name}.app.ipa" >> "$GITHUB_OUTPUT"
+          echo "zip_path=/tmp/release/${base_name}-ios-simulator.app.zip" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: m1-3-app-ios-unsigned
+          name: m1-3-app-ios
           path: |
             /tmp/release/*.app
-            /tmp/release/*.app.ipa
+            /tmp/release/*-ios-simulator.app.zip
+            /tmp/release/*.ipa
           if-no-files-found: error
 
       - name: Publish release
@@ -473,4 +546,5 @@ jobs:
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           generate_release_notes: false
           files: |
-            /tmp/release/*.app.ipa
+            /tmp/release/*-ios-simulator.app.zip
+            /tmp/release/*.ipa
