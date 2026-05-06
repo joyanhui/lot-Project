@@ -16,6 +16,11 @@ on:
         type: boolean
         required: false
         default: true
+      publish_release:
+        description: "Publish GitHub Release after build"
+        type: boolean
+        required: false
+        default: false
       build_target:
         description: "What to build"
         type: choice
@@ -24,6 +29,8 @@ on:
         options:
           - all
           - m1-3-app
+          - m1-3-app-android
+          - m1-3-app-desktop
           - esp32c3-firmware
 
 permissions:
@@ -35,7 +42,7 @@ concurrency:
 
 jobs:
   build-linux:
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -85,7 +92,6 @@ jobs:
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri build --bundles deb
-          cargo tauri build --bundles appimage
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -93,12 +99,10 @@ jobs:
           name: m1-3-app-linux
           path: |
             workspace/target/release/bundle/**/*.deb
-            workspace/target/release/bundle/**/*.AppImage
-            workspace/target/release/bundle/**/*.AppImage.tar.gz
           if-no-files-found: warn
 
   build-windows:
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
     runs-on: windows-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -151,7 +155,7 @@ jobs:
           if-no-files-found: warn
 
   build-macos:
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -190,6 +194,14 @@ jobs:
         working-directory: workspace/frontend
         shell: bash
         run: bun run build:tauri
+
+      - name: Build macOS DMG
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install tauri-cli --version "^2" --locked || true
+          cargo tauri build --bundles dmg
 
       - name: Initialize iOS project
         working-directory: workspace/m1-3-app
@@ -231,7 +243,7 @@ jobs:
           if-no-files-found: warn
 
   build-android:
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == '' }}
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -271,7 +283,7 @@ jobs:
         run: |
           set -euo pipefail
           rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
-          cargo install tauri-cli --version "^2" || true
+          cargo install tauri-cli --version "^2" --locked || true
 
       - name: Install Android NDK
         shell: bash
@@ -392,7 +404,7 @@ jobs:
       - build-macos
       - build-android
       - build-esp32c3-firmware
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
