@@ -31,6 +31,9 @@ on:
           - m1-3-app
           - m1-3-app-android
           - m1-3-app-desktop
+          - m2-1-listener-linux-x86_64
+          - m2-2-saver-linux-x86_64
+          - m3-v1-esp32c3-classicsimple-firmware
           - esp32c3-firmware
 
 permissions:
@@ -367,12 +370,133 @@ jobs:
           path: workspace/m1-3-app/gen/android/**/*.apk
           if-no-files-found: warn
 
-  build-esp32c3-firmware:
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'esp32c3-firmware' || github.event.inputs.build_target == '' }}
+  build-m2-1-listener-linux-x86_64:
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-1-listener-linux-x86_64' || github.event.inputs.build_target == '' }}
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      TARGET_TRIPLE: x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m2-1-listener-x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout public repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build m2-1-listener
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p m2-1-listener --target "${TARGET_TRIPLE}"
+
+      - name: Collect m2-1-listener artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
+          test -f "${binary_path}"
+          cp "${binary_path}" "/tmp/release/${OUTPUT_NAME}"
+          sha256sum "/tmp/release/${OUTPUT_NAME}" | tee "/tmp/release/${OUTPUT_NAME}.sha256"
+
+      - name: Upload m2-1-listener artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-1-listener-linux-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}*
+          if-no-files-found: error
+
+  build-m2-2-saver-linux-x86_64:
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-2-saver-linux-x86_64' || github.event.inputs.build_target == '' }}
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      TARGET_TRIPLE: x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m2-2-saver-x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout public repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build m2-2-saver
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p m2-2-saver --target "${TARGET_TRIPLE}"
+
+      - name: Collect m2-2-saver artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-saver"
+          test -f "${binary_path}"
+          cp "${binary_path}" "/tmp/release/${OUTPUT_NAME}"
+          sha256sum "/tmp/release/${OUTPUT_NAME}" | tee "/tmp/release/${OUTPUT_NAME}.sha256"
+
+      - name: Upload m2-2-saver artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-2-saver-linux-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}*
+          if-no-files-found: error
+
+  build-esp32c3-firmware:
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'esp32c3-firmware' || github.event.inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.inputs.build_target == '' }}
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      OUTPUT_NAME: m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf
     steps:
       - name: Checkout public repo
         uses: actions/checkout@v4
@@ -434,10 +558,11 @@ jobs:
             firmware_path="workspace/m3-v1/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
           fi
           test -f "${firmware_path}"
-          cp "${firmware_path}" /tmp/release/
+          cp "${firmware_path}" "/tmp/release/${OUTPUT_NAME}"
           cp workspace/m3-v1/config.toml.example /tmp/release/
           cp workspace/m3-v1/sdkconfig.defaults /tmp/release/
-          sha256sum /tmp/release/lot-manager-m3-firmware-esp32c3 | tee /tmp/release/lot-manager-m3-firmware-esp32c3.sha256
+          cp workspace/m3-v1/partitions.csv /tmp/release/
+          sha256sum "/tmp/release/${OUTPUT_NAME}" | tee "/tmp/release/${OUTPUT_NAME}.sha256"
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
@@ -453,6 +578,8 @@ jobs:
       - build-windows
       - build-macos
       - build-android
+      - build-m2-1-listener-linux-x86_64
+      - build-m2-2-saver-linux-x86_64
       - build-esp32c3-firmware
     if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
