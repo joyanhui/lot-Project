@@ -1,4 +1,4 @@
-name: Validate Rust Workspace
+name: CI
 
 on:
   workflow_dispatch:
@@ -12,11 +12,50 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-rust-workspace-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  verify:
+  verify-platform:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run platform verification
+        working-directory: workspace
+        shell: bash
+        run: bun run verify
+
+  verify-rust:
     runs-on: ubuntu-latest
     env:
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
