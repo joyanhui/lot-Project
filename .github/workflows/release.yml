@@ -497,6 +497,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       OUTPUT_NAME: m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf
+      ESP_IDF_VERSION: v5.2.2
     steps:
       - name: Checkout public repo
         uses: actions/checkout@v4
