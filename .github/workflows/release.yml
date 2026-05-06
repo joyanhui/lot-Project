@@ -527,11 +527,27 @@ jobs:
         with:
           components: rust-src
 
-      - name: Install ESP-IDF toolchain
-        uses: esp-rs/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: v5.2.2
-          target: esp32c3
+      - name: Install ESP-IDF system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            wget \
+            flex \
+            bison \
+            gperf \
+            python3 \
+            python3-pip \
+            python3-venv \
+            cmake \
+            ninja-build \
+            ccache \
+            libffi-dev \
+            libssl-dev \
+            dfu-util \
+            libusb-1.0-0
 
       - name: Prepare firmware config
         working-directory: workspace/m3-v1
