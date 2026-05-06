@@ -562,7 +562,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --bin lot-manager-m3-firmware-esp32c3 --target riscv32imc-esp-espidf
+          env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS cargo +nightly build -Zbuild-std=std,panic_abort --release --bin lot-manager-m3-firmware-esp32c3 --target riscv32imc-esp-espidf
 
       - name: Collect firmware artifacts
         shell: bash
