@@ -115,9 +115,7 @@ jobs:
           binary_path="workspace/target/release/lot-manager-m1-3-app"
           output_name="m1-3-app-x86_64-unknown-linux-gnu"
           test -f "${binary_path}"
-          cp "${binary_path}" "/tmp/release/${output_name}"
-          gzip -c "/tmp/release/${output_name}" > "/tmp/release/${output_name}.gz"
-          sha256sum "/tmp/release/${output_name}" | tee "/tmp/release/${output_name}.sha256"
+          gzip -c "${binary_path}" > "/tmp/release/${output_name}.gz"
           sha256sum "/tmp/release/${output_name}.gz" | tee "/tmp/release/${output_name}.gz.sha256"
 
       - name: Upload m1-3-app Linux artifacts
@@ -125,7 +123,8 @@ jobs:
         with:
           name: m1-3-app-linux
           path: |
-            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu*
+            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz
+            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz.sha256
           if-no-files-found: warn
 
   build-windows:
