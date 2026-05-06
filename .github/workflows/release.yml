@@ -45,7 +45,7 @@ concurrency:
 
 jobs:
   build-linux:
-    name: Build m1-3-app Linux (.deb)
+    name: Build m1-3-app Linux x86_64 binary
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
     runs-on: ubuntu-latest
     env:
@@ -99,20 +99,33 @@ jobs:
         shell: bash
         run: bun run build:tauri
 
-      - name: Build m1-3-app Linux .deb
+      - name: Build m1-3-app Linux x86_64 binary
         working-directory: workspace/m1-3-app
         shell: bash
         run: |
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
-          cargo tauri build --bundles deb
+          cargo tauri build --no-bundle
+
+      - name: Collect m1-3-app Linux x86_64 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/target/release/lot-manager-m1-3-app"
+          output_name="m1-3-app-x86_64-unknown-linux-gnu"
+          test -f "${binary_path}"
+          cp "${binary_path}" "/tmp/release/${output_name}"
+          gzip -c "/tmp/release/${output_name}" > "/tmp/release/${output_name}.gz"
+          sha256sum "/tmp/release/${output_name}" | tee "/tmp/release/${output_name}.sha256"
+          sha256sum "/tmp/release/${output_name}.gz" | tee "/tmp/release/${output_name}.gz.sha256"
 
       - name: Upload m1-3-app Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-linux
           path: |
-            workspace/target/release/bundle/**/*.deb
+            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu*
           if-no-files-found: warn
 
   build-windows:
