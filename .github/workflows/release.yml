@@ -74,7 +74,7 @@ jobs:
         run: bun install
 
       - name: Build frontend for tauri
-        working-directory: workspace/m1-1-platform/frontend
+        working-directory: workspace/frontend
         shell: bash
         run: bun run build:tauri
 
@@ -83,17 +83,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bunx tauri build --bundles deb
-          bunx tauri build --bundles appimage
+          cargo install tauri-cli --version "^2" --locked || true
+          cargo tauri build --bundles deb
+          cargo tauri build --bundles appimage
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-linux
           path: |
-            workspace/m1-3-app/src-tauri/target/release/bundle/**/*.deb
-            workspace/m1-3-app/src-tauri/target/release/bundle/**/*.AppImage
-            workspace/m1-3-app/src-tauri/target/release/bundle/**/*.AppImage.tar.gz
+            workspace/target/release/bundle/**/*.deb
+            workspace/target/release/bundle/**/*.AppImage
+            workspace/target/release/bundle/**/*.AppImage.tar.gz
           if-no-files-found: warn
 
   build-windows:
@@ -129,20 +130,24 @@ jobs:
         run: bun install
 
       - name: Build frontend for tauri
-        working-directory: workspace/m1-1-platform/frontend
+        working-directory: workspace/frontend
         shell: bash
         run: bun run build:tauri
 
       - name: Build Tauri app
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri build --bundles msi
+        run: |
+          set -euo pipefail
+          cargo install tauri-cli --version "^2" --locked || true
+          cargo tauri build --bundles msi
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-windows
-          path: workspace/m1-3-app/src-tauri/target/release/bundle/**/*.msi
+          path: |
+            workspace/target/release/bundle/**/*.msi
           if-no-files-found: warn
 
   build-macos:
@@ -182,31 +187,34 @@ jobs:
         run: bun install
 
       - name: Build frontend for tauri
-        working-directory: workspace/m1-1-platform/frontend
+        working-directory: workspace/frontend
         shell: bash
         run: bun run build:tauri
 
       - name: Initialize iOS project
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri ios init --ci --skip-targets-install
+        run: |
+          set -euo pipefail
+          cargo install tauri-cli --version "^2" --locked || true
+          cargo tauri ios init --ci --skip-targets-install
 
       - name: Copy bridge templates to iOS project
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bun run scripts/copy-mobile-bridges.ts ios
+        run: python3 ../script/m1-3/copy-mobile-bridges.py ios
 
       - name: Build unsigned iOS simulator app
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri ios build --target aarch64-sim --ci
+        run: cargo tauri ios build --target aarch64-sim --ci
 
       - name: Package iOS simulator app
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          app_path="$(find workspace/m1-3-app/src-tauri/gen/apple/build/Products/Release-iphonesimulator -type d -name '*.app' | head -1)"
+          app_path="$(find workspace/m1-3-app/gen/apple/build/Products/Release-iphonesimulator -type d -name '*.app' | head -1)"
           test -n "${app_path}"
           cp -R "${app_path}" /tmp/release/
           app_name="$(basename "${app_path}")"
@@ -218,7 +226,7 @@ jobs:
         with:
           name: m1-3-app-apple
           path: |
-            workspace/m1-3-app/src-tauri/target/release/bundle/**/*.dmg
+            workspace/target/release/bundle/**/*.dmg
             /tmp/release/*-ios-simulator.app.zip
           if-no-files-found: warn
 
@@ -278,33 +286,33 @@ jobs:
         run: bun install
 
       - name: Build frontend for tauri
-        working-directory: workspace/m1-1-platform/frontend
+        working-directory: workspace/frontend
         shell: bash
         run: bun run build:tauri
 
       - name: Initialize Android project
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri android init --ci --skip-targets-install
+        run: cargo tauri android init --ci --skip-targets-install
 
       - name: Copy bridge templates & configure signing
         working-directory: workspace/m1-3-app
         shell: bash
         run: |
           set -euo pipefail
-          bun run scripts/copy-mobile-bridges.ts android
-          bun run scripts/configure-android-signing.ts
+          python3 ../script/m1-3/copy-mobile-bridges.py android
+          python3 ../script/m1-3/configure-android-signing.py
 
       - name: Build Android APK
         working-directory: workspace/m1-3-app
         shell: bash
-        run: bunx tauri android build --target aarch64 --apk
+        run: cargo tauri android build --target aarch64 --apk
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-android
-          path: workspace/m1-3-app/src-tauri/gen/android/**/*.apk
+          path: workspace/m1-3-app/gen/android/**/*.apk
           if-no-files-found: warn
 
   build-esp32c3-firmware:
@@ -345,9 +353,7 @@ jobs:
         run: |
           set -euo pipefail
           cp config.toml.example config.toml
-          mkdir -p .cargo
-          cp .cargo/config.esp32c3.toml.example .cargo/config.toml
-          cp rust-toolchain.esp32c3.toml.example rust-toolchain.toml
+          bash ../script/prepare-m3-sdkconfig.sh
 
       - name: Build firmware ELF
         working-directory: workspace/m3-v1
@@ -361,7 +367,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          cp workspace/m3-v1/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3 /tmp/release/
+          firmware_path="workspace/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
+          if [[ ! -f "${firmware_path}" ]]; then
+            firmware_path="workspace/m3-v1/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
+          fi
+          test -f "${firmware_path}"
+          cp "${firmware_path}" /tmp/release/
           cp workspace/m3-v1/config.toml.example /tmp/release/
           cp workspace/m3-v1/sdkconfig.defaults /tmp/release/
           sha256sum /tmp/release/lot-manager-m3-firmware-esp32c3 | tee /tmp/release/lot-manager-m3-firmware-esp32c3.sha256
