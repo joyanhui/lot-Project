@@ -4,7 +4,7 @@
 
 ## M1-3 App Release Workflow
 
-- Workflow 位置：`.github/workflows/release-m1-3-app.yml`
+- Workflow 位置：`.github/workflows/release.yml`
 - 源码来源：`https://github.com/joyanhui/lot-manager-aio`
 - 私有仓库拉取凭据：GitHub Actions secret `TOKEN_GH`
 
