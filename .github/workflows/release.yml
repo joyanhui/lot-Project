@@ -366,24 +366,56 @@ jobs:
         shell: bash
         run: cargo tauri android init --ci --skip-targets-install
 
-      - name: Copy m1-3-app Android bridges and configure signing
+      - name: Copy m1-3-app Android bridges
         working-directory: workspace/m1-3-app
         shell: bash
         run: |
           set -euo pipefail
           python3 ../script/m1-3/copy-mobile-bridges.py android
-          python3 ../script/m1-3/configure-android-signing.py
 
       - name: Build m1-3-app Android APK
         working-directory: workspace/m1-3-app
         shell: bash
         run: cargo tauri android build --target aarch64 --apk
 
+      - name: Sign m1-3-app Android APK
+        working-directory: workspace/m1-3-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          unsigned_apk="$(find gen/android -type f -name '*-unsigned.apk' | head -1)"
+          test -n "${unsigned_apk}"
+          props_file="signing/android/release-signing.properties"
+          test -f "${props_file}"
+          keystore_rel="$(grep '^storeFile=' "${props_file}" | cut -d= -f2-)"
+          store_password="$(grep '^storePassword=' "${props_file}" | cut -d= -f2-)"
+          key_alias="$(grep '^keyAlias=' "${props_file}" | cut -d= -f2-)"
+          key_password="$(grep '^keyPassword=' "${props_file}" | cut -d= -f2-)"
+          keystore_path="${keystore_rel}"
+          if [[ ! -f "${keystore_path}" ]]; then
+            keystore_path="$(basename "${keystore_rel}")"
+            keystore_path="signing/android/${keystore_path}"
+          fi
+          test -f "${keystore_path}"
+          signed_apk="${unsigned_apk/-unsigned.apk/.apk}"
+          build_tools_dir="$(find "${ANDROID_HOME}/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
+          test -n "${build_tools_dir}"
+          "${build_tools_dir}/apksigner" sign \
+            --ks "${keystore_path}" \
+            --ks-key-alias "${key_alias}" \
+            --ks-pass "pass:${store_password}" \
+            --key-pass "pass:${key_password}" \
+            --out "${signed_apk}" \
+            "${unsigned_apk}"
+          "${build_tools_dir}/apksigner" verify "${signed_apk}"
+
       - name: Upload m1-3-app Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-android
-          path: workspace/m1-3-app/gen/android/**/*.apk
+          path: |
+            workspace/m1-3-app/gen/android/**/*.apk
+            !workspace/m1-3-app/gen/android/**/*-unsigned.apk
           if-no-files-found: warn
 
   build-m2-1-listener-linux-x86_64:
