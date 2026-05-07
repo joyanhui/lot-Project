@@ -432,9 +432,16 @@ jobs:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
           release_tag="${{ github.event.inputs.release_tag }}"
-          files=(workspace/target/release/bundle/**/*.dmg /tmp/release/*-ios-simulator.app.ipa)
+          files=()
+          while IFS= read -r file; do
+            files+=("${file}")
+          done < <(
+            {
+              find workspace/target/release/bundle -type f -name '*.dmg' 2>/dev/null
+              find /tmp/release -maxdepth 1 -type f -name '*-ios-simulator.app.ipa' 2>/dev/null
+            } | sort
+          )
           ((${#files[@]} > 0))
           if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
             if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
