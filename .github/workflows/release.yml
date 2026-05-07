@@ -17,7 +17,12 @@ on:
         required: false
         default: true
       publish_release:
-        description: "Publish GitHub Release after build"
+        description: "Publish private GitHub Release after build"
+        type: boolean
+        required: false
+        default: false
+      publish_public_release:
+        description: "Publish public GitHub Release on lot-Project after build"
         type: boolean
         required: false
         default: false
@@ -1291,7 +1296,7 @@ jobs:
           gh release upload "${release_tag}" /tmp/release/* -R "${PRIVATE_RELEASE_REPO}" --clobber
 
   publish-release:
-    name: Publish collected release artifacts
+    name: Publish collected public release artifacts
     runs-on: ubuntu-latest
     needs:
       - prepare-private-release
@@ -1308,7 +1313,7 @@ jobs:
       - build-m2-2-saver-linux-x86_64
       - build-m2-2-saver-linux-armv8
       - build-esp32c3-firmware
-    if: always() && github.event.inputs.publish_release != 'false' && (github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: always() && github.event.inputs.publish_public_release == 'true' && (github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Download all collected artifacts
         uses: actions/download-artifact@v4
