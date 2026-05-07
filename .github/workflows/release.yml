@@ -1337,6 +1337,9 @@ jobs:
               m2-2-saver-linux-armv8.gz)
                 dest="m2-2-saver-linux-armv8.gz"
                 ;;
+              m1-3-app-linux-x86_64.gz)
+                dest="m1-3-app-linux-x86_64.gz"
+                ;;
               M3-v1-esp32c3-classicsimple-firmware.elf)
                 dest="M3-v1-esp32c3-classicsimple-firmware.elf"
                 ;;
