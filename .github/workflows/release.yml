@@ -1272,6 +1272,25 @@ jobs:
       - build-esp32c3-firmware
     if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
+      - name: Checkout lot-manager-aio workspace for private release finalization
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          path: workspace
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN_GH }}
+
+      - name: Switch private release finalization workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_ref="${{ github.event.inputs.source_ref }}"
+          if [[ -n "${source_ref}" ]]; then
+            git fetch --all --tags --prune
+            git checkout "${source_ref}"
+          fi
+
       - name: Normalize and republish private release assets
         shell: bash
         env:
