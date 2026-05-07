@@ -209,18 +209,16 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/release
           binary_path="workspace/target/release/lot-manager-m1-3-app"
-          output_name="m1-3-app-x86_64-unknown-linux-gnu"
+          output_name="m1-3-app-linux-x86_64"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${output_name}.gz"
-          sha256sum "/tmp/release/${output_name}.gz" | tee "/tmp/release/${output_name}.gz.sha256"
 
       - name: Upload m1-3-app Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-linux
           path: |
-            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz
-            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz.sha256
+            /tmp/release/m1-3-app-linux-x86_64.gz
           if-no-files-found: warn
 
       - name: Upload m1-3-app Linux artifacts to private release
@@ -239,8 +237,7 @@ jobs:
             fi
           fi
           gh release upload "${release_tag}" \
-            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz \
-            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz.sha256 \
+            /tmp/release/m1-3-app-linux-x86_64.gz \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -298,12 +295,21 @@ jobs:
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri build --bundles msi
 
+      - name: Collect m1-3-app Windows .msi artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          msi_path="$(find workspace/target/release/bundle -type f -name '*.msi' | head -1)"
+          test -n "${msi_path}"
+          cp "${msi_path}" /tmp/release/m1-3-app-windows-x64.msi
+
       - name: Upload m1-3-app Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-windows
           path: |
-            workspace/target/release/bundle/**/*.msi
+            /tmp/release/m1-3-app-windows-x64.msi
           if-no-files-found: warn
 
       - name: Upload m1-3-app Windows artifacts to private release
@@ -313,10 +319,7 @@ jobs:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
           release_tag="${{ github.event.inputs.release_tag }}"
-          files=(workspace/target/release/bundle/**/*.msi)
-          ((${#files[@]} > 0))
           if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
             if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
               gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
@@ -324,7 +327,7 @@ jobs:
               gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
             fi
           fi
-          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+          gh release upload "${release_tag}" /tmp/release/m1-3-app-windows-x64.msi -R "${PRIVATE_RELEASE_REPO}" --clobber
 
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
@@ -409,20 +412,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
+          dmg_path="$(find workspace/target/release/bundle -type f -name '*.dmg' | head -1)"
+          test -n "${dmg_path}"
+          cp "${dmg_path}" /tmp/release/m1-3-app-macos.dmg
           app_path="$(find workspace/m1-3-app/gen/apple/build -type d -name '*.app' | head -1)"
           test -n "${app_path}"
           cp -R "${app_path}" /tmp/release/
-          app_name="$(basename "${app_path}")"
-          base_name="${app_name%.app}"
-          ditto -c -k --keepParent "${app_path}" "/tmp/release/${base_name}-ios-simulator.app.ipa"
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/m1-3-app-ios-simulator.app.ipa"
 
       - name: Upload m1-3-app macOS/iOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-apple
           path: |
-            workspace/target/release/bundle/**/*.dmg
-            /tmp/release/*-ios-simulator.app.ipa
+            /tmp/release/m1-3-app-macos.dmg
+            /tmp/release/m1-3-app-ios-simulator.app.ipa
           if-no-files-found: warn
 
       - name: Upload m1-3-app macOS/iOS artifacts to private release
@@ -438,8 +442,8 @@ jobs:
             files+=("${file}")
           done < <(
             {
-              find workspace/target/release/bundle -type f -name '*.dmg' 2>/dev/null
-              find /tmp/release -maxdepth 1 -type f -name '*-ios-simulator.app.ipa' 2>/dev/null
+              find /tmp/release -maxdepth 1 -type f -name 'm1-3-app-macos.dmg' 2>/dev/null
+              find /tmp/release -maxdepth 1 -type f -name 'm1-3-app-ios-simulator.app.ipa' 2>/dev/null
             } | sort
           )
           ((${#files[@]} > 0))
@@ -531,20 +535,25 @@ jobs:
           set -euo pipefail
           python3 ../script/m1-3/copy-mobile-bridges.py android
 
-      - name: Build m1-3-app Android APK
+      - name: Build m1-3-app Android universal APK and AAB
         working-directory: workspace/m1-3-app
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
-        run: cargo tauri android build --target aarch64 --apk
+        run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --aab
+
+      - name: Build m1-3-app Android split APKs
+        working-directory: workspace/m1-3-app
+        shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
+        run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --split-per-abi
 
       - name: Sign m1-3-app Android APK
         working-directory: workspace/m1-3-app
         shell: bash
         run: |
           set -euo pipefail
-          unsigned_apk="$(find gen/android -type f -name '*-unsigned.apk' | head -1)"
-          test -n "${unsigned_apk}"
           props_file="signing/android/release-signing.properties"
           test -f "${props_file}"
           keystore_rel="$(grep '^storeFile=' "${props_file}" | cut -d= -f2-)"
@@ -557,25 +566,54 @@ jobs:
             keystore_path="signing/android/${keystore_path}"
           fi
           test -f "${keystore_path}"
-          signed_apk="${unsigned_apk/-unsigned.apk/.apk}"
           build_tools_dir="$(find "${ANDROID_HOME}/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
           test -n "${build_tools_dir}"
-          "${build_tools_dir}/apksigner" sign \
-            --ks "${keystore_path}" \
-            --ks-key-alias "${key_alias}" \
-            --ks-pass "pass:${store_password}" \
-            --key-pass "pass:${key_password}" \
-            --out "${signed_apk}" \
-            "${unsigned_apk}"
-          "${build_tools_dir}/apksigner" verify "${signed_apk}"
+          mkdir -p /tmp/release/android
+
+          while IFS= read -r unsigned_apk; do
+            signed_apk="${unsigned_apk/-unsigned.apk/.apk}"
+            "${build_tools_dir}/apksigner" sign \
+              --ks "${keystore_path}" \
+              --ks-key-alias "${key_alias}" \
+              --ks-pass "pass:${store_password}" \
+              --key-pass "pass:${key_password}" \
+              --out "${signed_apk}" \
+              "${unsigned_apk}"
+            "${build_tools_dir}/apksigner" verify "${signed_apk}"
+
+            case "$(basename "${signed_apk}")" in
+              *universal*.apk)
+                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-universal.apk
+                ;;
+              *arm64-v8a*.apk|*aarch64*.apk)
+                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-arm64-v8a.apk
+                ;;
+              *armeabi-v7a*.apk|*armv7*.apk)
+                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-armeabi-v7a.apk
+                ;;
+              *x86_64*.apk)
+                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-x86_64.apk
+                ;;
+            esac
+          done < <(find gen/android -type f -name '*-unsigned.apk' | sort)
+
+          unsigned_aab="$(find gen/android -type f -name '*.aab' | head -1)"
+          test -n "${unsigned_aab}"
+          signed_aab="/tmp/release/android/m1-3-app-android.aab"
+          jarsigner \
+            -keystore "${keystore_path}" \
+            -storepass "${store_password}" \
+            -keypass "${key_password}" \
+            -signedjar "${signed_aab}" \
+            "${unsigned_aab}" \
+            "${key_alias}"
 
       - name: Upload m1-3-app Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: m1-3-app-android
           path: |
-            workspace/m1-3-app/gen/android/**/*.apk
-            !workspace/m1-3-app/gen/android/**/*-unsigned.apk
+            /tmp/release/android/*
           if-no-files-found: warn
 
       - name: Upload m1-3-app Android artifacts to private release
@@ -585,13 +623,7 @@ jobs:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
           release_tag="${{ github.event.inputs.release_tag }}"
-          files=()
-          while IFS= read -r file; do
-            files+=("${file}")
-          done < <(find workspace/m1-3-app/gen/android -type f -name '*.apk' ! -name '*-unsigned.apk' | sort)
-          ((${#files[@]} > 0))
           if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
             if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
               gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
@@ -599,7 +631,7 @@ jobs:
               gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
             fi
           fi
-          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+          gh release upload "${release_tag}" /tmp/release/android/* -R "${PRIVATE_RELEASE_REPO}" --clobber
 
   build-m1-2-device-init-reg-proxy-linux-x86_64:
     name: Build m1-2-device-init-reg-proxy Linux x86_64 .gz
@@ -609,7 +641,7 @@ jobs:
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      OUTPUT_NAME: m1-2-device-init-reg-proxy-x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m1-2-device-init-reg-proxy-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -656,7 +688,6 @@ jobs:
           binary_path="workspace/m1-2-device-init-reg-proxy/dist/${OUTPUT_NAME}"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m1-2-device-init-reg-proxy x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -675,7 +706,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -690,7 +720,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       IMAGE_NAME: lot-manager-m1-1-platform:x86_64-local-workerd
-      OUTPUT_NAME: m1-1-platform-x86_64-linux-docker-image.tar.gz
+      OUTPUT_NAME: m1-1-platform-linux-x86_64-docker-image.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -737,7 +767,6 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/release
           docker image save "${IMAGE_NAME}" | gzip > "/tmp/release/${OUTPUT_NAME}"
-          sha256sum "/tmp/release/${OUTPUT_NAME}" | tee "/tmp/release/${OUTPUT_NAME}.sha256"
 
       - name: Upload m1-1-platform x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -749,7 +778,6 @@ jobs:
           release_tag="${{ github.event.inputs.release_tag }}"
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }} \
-            /tmp/release/${{ env.OUTPUT_NAME }}.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -761,7 +789,7 @@ jobs:
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      OUTPUT_NAME: m1-2-device-init-reg-proxy-armv8-unknown-linux-gnu
+      OUTPUT_NAME: m1-2-device-init-reg-proxy-linux-armv8
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -808,7 +836,6 @@ jobs:
           binary_path="workspace/m1-2-device-init-reg-proxy/dist/${OUTPUT_NAME}"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m1-2-device-init-reg-proxy armv8 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -827,7 +854,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -840,7 +866,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-1-listener-x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m2-1-listener-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -884,7 +910,6 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m2-1-listener x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -903,7 +928,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -916,7 +940,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-gnu
-      OUTPUT_NAME: m2-1-listener-armv8-unknown-linux-gnu
+      OUTPUT_NAME: m2-1-listener-linux-armv8
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -971,7 +995,6 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m2-1-listener armv8 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -990,7 +1013,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -1003,7 +1025,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-2-saver-x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m2-2-saver-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -1047,7 +1069,6 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-saver"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m2-2-saver x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -1066,7 +1087,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -1079,7 +1099,7 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-gnu
-      OUTPUT_NAME: m2-2-saver-armv8-unknown-linux-gnu
+      OUTPUT_NAME: m2-2-saver-linux-armv8
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -1134,7 +1154,6 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-saver"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
       - name: Upload m2-2-saver armv8 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -1153,7 +1172,6 @@ jobs:
           fi
           gh release upload "${release_tag}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
             -R "${PRIVATE_RELEASE_REPO}" \
             --clobber
 
@@ -1165,7 +1183,7 @@ jobs:
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      OUTPUT_NAME: m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf
+      OUTPUT_NAME: M3-v1-esp32c3-classicsimple-firmware.elf
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -1276,14 +1294,11 @@ jobs:
           fi
           test -f "${bootloader_path}"
           cp "${firmware_path}" "/tmp/release/${OUTPUT_NAME}"
-          cp "${partition_table_path}" /tmp/release/partition-table.bin
-          cp "${bootloader_path}" /tmp/release/bootloader.bin
-          cp workspace/m3-v1/config.toml.example /tmp/release/
-          cp workspace/m3-v1/sdkconfig.defaults /tmp/release/
-          cp workspace/m3-v1/partitions.csv /tmp/release/
-          sha256sum "/tmp/release/${OUTPUT_NAME}" | tee "/tmp/release/${OUTPUT_NAME}.sha256"
-          sha256sum /tmp/release/partition-table.bin | tee /tmp/release/partition-table.bin.sha256
-          sha256sum /tmp/release/bootloader.bin | tee /tmp/release/bootloader.bin.sha256
+          cp "${partition_table_path}" /tmp/release/M3-v1-esp32c3-classicsimple-partition-table.bin
+          cp "${bootloader_path}" /tmp/release/M3-v1-esp32c3-classicsimple-bootloader.bin
+          cp workspace/m3-v1/config.toml.example /tmp/release/M3-v1-esp32c3-classicsimple-config.toml.example
+          cp workspace/m3-v1/sdkconfig.defaults /tmp/release/M3-v1-esp32c3-classicsimple-sdkconfig.defaults
+          cp workspace/m3-v1/partitions.csv /tmp/release/M3-v1-esp32c3-classicsimple-partitions.csv
 
       - name: Upload m3-v1 esp32c3-classicsimple firmware artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
