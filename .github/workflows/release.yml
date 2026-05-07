@@ -570,10 +570,10 @@ jobs:
               *universal*.apk)
                 cp "${signed_apk}" /tmp/release/android/m1-3-app-android-universal.apk
                 ;;
-              *arm64-v8a*.apk|*aarch64*.apk)
+              *arm64-v8a*.apk|*aarch64*.apk|*arm64*.apk)
                 cp "${signed_apk}" /tmp/release/android/m1-3-app-android-arm64-v8a.apk
                 ;;
-              *armeabi-v7a*.apk|*armv7*.apk)
+              *armeabi-v7a*.apk|*armv7*.apk|*arm-release*.apk)
                 cp "${signed_apk}" /tmp/release/android/m1-3-app-android-armeabi-v7a.apk
                 ;;
               *x86_64*.apk)
