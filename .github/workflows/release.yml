@@ -1160,6 +1160,8 @@ jobs:
       - name: Build m3-v1 esp32c3-classicsimple firmware ELF
         working-directory: workspace/m3-v1
         shell: bash
+        env:
+          ESP_IDF_SDKCONFIG_DEFAULTS: ${{ github.workspace }}/workspace/m3-v1/sdkconfig.defaults
         run: |
           set -euo pipefail
           env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS cargo +nightly build -Zbuild-std=std,panic_abort --release --bin lot-manager-m3-firmware-esp32c3 --target riscv32imc-esp-espidf
