@@ -28,6 +28,8 @@ on:
         default: "all"
         options:
           - all
+          - m1-1-platform-linux
+          - m1-1-platform-linux-x86_64
           - m1-3-app
           - m1-3-app-android
           - m1-3-app-desktop
@@ -50,10 +52,35 @@ concurrency:
   group: release-${{ github.event.inputs.release_tag }}
   cancel-in-progress: true
 
+env:
+  PRIVATE_RELEASE_REPO: joyanhui/lot-manager-aio
+
 jobs:
+  prepare-private-release:
+    name: Prepare private lot-manager-aio release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure private release exists when publishing
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+            gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
+          else
+            gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
+          fi
+
   build-linux:
     name: Build m1-3-app Linux x86_64 binary
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -67,7 +94,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-3-app Linux
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -134,9 +161,31 @@ jobs:
             /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz.sha256
           if-no-files-found: warn
 
+      - name: Upload m1-3-app Linux artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz \
+            /tmp/release/m1-3-app-x86_64-unknown-linux-gnu.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
+
   build-windows:
     name: Build m1-3-app Windows (.msi)
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: windows-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -150,7 +199,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-3-app Windows
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -198,9 +247,30 @@ jobs:
             workspace/target/release/bundle/**/*.msi
           if-no-files-found: warn
 
+      - name: Upload m1-3-app Windows artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          release_tag="${{ github.event.inputs.release_tag }}"
+          files=(workspace/target/release/bundle/**/*.msi)
+          ((${#files[@]} > 0))
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -214,7 +284,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-3-app macOS/iOS
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -297,9 +367,30 @@ jobs:
             /tmp/release/*-ios-simulator.app.ipa
           if-no-files-found: warn
 
+      - name: Upload m1-3-app macOS/iOS artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          release_tag="${{ github.event.inputs.release_tag }}"
+          files=(workspace/target/release/bundle/**/*.dmg /tmp/release/*-ios-simulator.app.ipa)
+          ((${#files[@]} > 0))
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+
   build-android:
     name: Build m1-3-app Android (.apk)
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -313,7 +404,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-3-app Android
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -425,9 +516,33 @@ jobs:
             !workspace/m1-3-app/gen/android/**/*-unsigned.apk
           if-no-files-found: warn
 
+      - name: Upload m1-3-app Android artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          release_tag="${{ github.event.inputs.release_tag }}"
+          files=()
+          while IFS= read -r file; do
+            files+=("${file}")
+          done < <(find workspace/m1-3-app/gen/android -type f -name '*.apk' ! -name '*-unsigned.apk' | sort)
+          ((${#files[@]} > 0))
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+
   build-m1-2-device-init-reg-proxy-linux-x86_64:
     name: Build m1-2-device-init-reg-proxy Linux x86_64 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-2-device-init-reg-proxy-linux' || github.event.inputs.build_target == 'm1-2-device-init-reg-proxy-linux-x86_64' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -442,7 +557,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-2-device-init-reg-proxy x86_64
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -481,18 +596,102 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m1-2-device-init-reg-proxy x86_64 .gz artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload m1-2-device-init-reg-proxy x86_64 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
+
+  build-m1-1-platform-linux-x86_64:
+    name: Build m1-1-platform Linux x86_64 .gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-linux' || github.event.inputs.build_target == 'm1-1-platform-linux-x86_64' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      OUTPUT_NAME: m1-1-platform-x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
         with:
-          name: m1-2-device-init-reg-proxy-linux-x86_64
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m1-1-platform x86_64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m1-1-platform x86_64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun for m1-1-platform x86_64
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies for m1-1-platform x86_64
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build m1-1-platform Linux x86_64 standalone binary
+        working-directory: workspace
+        shell: bash
+        run: bun run --filter @lot-manager/m1-1-platform build:standalone:linux:x86_64
+
+      - name: Collect m1-1-platform x86_64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/m1-1-platform/dist/${OUTPUT_NAME}"
+          test -f "${binary_path}"
+          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+          sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
+
+      - name: Upload m1-1-platform x86_64 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-m1-2-device-init-reg-proxy-linux-armv8:
     name: Build m1-2-device-init-reg-proxy Linux armv8 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-2-device-init-reg-proxy-linux' || github.event.inputs.build_target == 'm1-2-device-init-reg-proxy-linux-armv8' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -507,7 +706,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m1-2-device-init-reg-proxy armv8
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -546,18 +745,31 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m1-2-device-init-reg-proxy armv8 .gz artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m1-2-device-init-reg-proxy-linux-armv8
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+      - name: Upload m1-2-device-init-reg-proxy armv8 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-m2-1-listener-linux-x86_64:
     name: Build m2-1-listener Linux x86_64 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-1-listener-linux' || github.event.inputs.build_target == 'm2-1-listener-linux-x86_64' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -573,7 +785,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m2-1-listener x86_64
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -609,18 +821,31 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m2-1-listener x86_64 .gz artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m2-1-listener-linux-x86_64
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+      - name: Upload m2-1-listener x86_64 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-m2-1-listener-linux-armv8:
     name: Build m2-1-listener Linux armv8 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-1-listener-linux' || github.event.inputs.build_target == 'm2-1-listener-linux-armv8' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -636,7 +861,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m2-1-listener armv8
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -683,18 +908,31 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m2-1-listener armv8 .gz artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m2-1-listener-linux-armv8
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+      - name: Upload m2-1-listener armv8 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-m2-2-saver-linux-x86_64:
     name: Build m2-2-saver Linux x86_64 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-2-saver-linux' || github.event.inputs.build_target == 'm2-2-saver-linux-x86_64' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -710,7 +948,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m2-2-saver x86_64
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -746,18 +984,31 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m2-2-saver x86_64 .gz artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m2-2-saver-linux-x86_64
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+      - name: Upload m2-2-saver x86_64 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-m2-2-saver-linux-armv8:
     name: Build m2-2-saver Linux armv8 .gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-2-saver-linux' || github.event.inputs.build_target == 'm2-2-saver-linux-armv8' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -773,7 +1024,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m2-2-saver armv8
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -820,18 +1071,31 @@ jobs:
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
           sha256sum "/tmp/release/${OUTPUT_NAME}.gz" | tee "/tmp/release/${OUTPUT_NAME}.gz.sha256"
 
-      - name: Upload m2-2-saver armv8 .gz artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m2-2-saver-linux-armv8
-          path: |
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256
-          if-no-files-found: error
+      - name: Upload m2-2-saver armv8 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz.sha256 \
+            -R "${PRIVATE_RELEASE_REPO}" \
+            --clobber
 
   build-esp32c3-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'esp32c3-firmware' || github.event.inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -847,7 +1111,7 @@ jobs:
       - name: Checkout lot-manager-aio workspace for m3-v1 esp32c3-classicsimple
         uses: actions/checkout@v4
         with:
-          repository: joyanhui/lot-manager-aio
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
           ref: main
           token: ${{ secrets.TOKEN_GH }}
           path: workspace
@@ -935,17 +1199,28 @@ jobs:
           sha256sum /tmp/release/partition-table.bin | tee /tmp/release/partition-table.bin.sha256
           sha256sum /tmp/release/bootloader.bin | tee /tmp/release/bootloader.bin.sha256
 
-      - name: Upload m3-v1 esp32c3-classicsimple firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: esp32c3-firmware
-          path: /tmp/release/*
-          if-no-files-found: error
+      - name: Upload m3-v1 esp32c3-classicsimple firmware artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
+            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
+            else
+              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
+            fi
+          fi
+          gh release upload "${release_tag}" /tmp/release/* -R "${PRIVATE_RELEASE_REPO}" --clobber
 
   publish-release:
     name: Publish collected release artifacts
     runs-on: ubuntu-latest
     needs:
+      - prepare-private-release
       - build-linux
       - build-windows
       - build-macos
@@ -957,7 +1232,7 @@ jobs:
       - build-m2-2-saver-linux-x86_64
       - build-m2-2-saver-linux-armv8
       - build-esp32c3-firmware
-    if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: always() && github.event.inputs.publish_release != 'false' && (github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Download all collected artifacts
         uses: actions/download-artifact@v4
