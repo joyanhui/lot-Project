@@ -1184,6 +1184,10 @@ jobs:
         with:
           components: rust-src
 
+      - name: Install ldproxy for m3-v1 esp32c3-classicsimple
+        shell: bash
+        run: cargo install ldproxy --locked
+
       - name: Install ESP-IDF system dependencies for m3-v1 esp32c3-classicsimple
         shell: bash
         run: |
