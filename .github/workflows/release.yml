@@ -1317,6 +1317,153 @@ jobs:
           fi
           gh release upload "${release_tag}" /tmp/release/* -R "${PRIVATE_RELEASE_REPO}" --clobber
 
+  finalize-private-release-assets:
+    name: Finalize private release assets
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-private-release
+      - build-linux
+      - build-windows
+      - build-macos
+      - build-android
+      - prepare-shared-frontend-assets
+      - build-m1-1-platform-linux-x86_64
+      - build-m1-2-device-init-reg-proxy-linux-x86_64
+      - build-m1-2-device-init-reg-proxy-linux-armv8
+      - build-m2-1-listener-linux-x86_64
+      - build-m2-1-listener-linux-armv8
+      - build-m2-2-saver-linux-x86_64
+      - build-m2-2-saver-linux-armv8
+      - build-esp32c3-firmware
+    if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    steps:
+      - name: Normalize and republish private release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          raw_dir="$(mktemp -d)"
+          final_dir="$(mktemp -d)"
+
+          gh release download "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" -D "${raw_dir}"
+
+          normalize_asset() {
+            local src="$1"
+            local base dest
+            base="$(basename "$src")"
+            dest=""
+
+            case "$base" in
+              *.sha256|SHA256SUMS.txt)
+                return 0
+                ;;
+              m1-1-platform-*.tar.gz)
+                dest="m1-1-platform-linux-x86_64-docker.tar.gz"
+                ;;
+              m1-2-device-init-reg-proxy-linux-x86_64.gz)
+                dest="m1-2-device-init-reg-proxy-linux-x86_64.gz"
+                ;;
+              m1-2-device-init-reg-proxy-linux-armv8.gz)
+                dest="m1-2-device-init-reg-proxy-linux-armv8.gz"
+                ;;
+              m2-1-listener-linux-x86_64.gz)
+                dest="m2-1-listener-linux-x86_64.gz"
+                ;;
+              m2-1-listener-linux-armv8.gz)
+                dest="m2-1-listener-linux-armv8.gz"
+                ;;
+              m2-2-saver-linux-x86_64.gz)
+                dest="m2-2-saver-linux-x86_64.gz"
+                ;;
+              m2-2-saver-linux-armv8.gz)
+                dest="m2-2-saver-linux-armv8.gz"
+                ;;
+              M3-v1-esp32c3-classicsimple-firmware.elf)
+                dest="M3-v1-esp32c3-classicsimple-firmware.elf"
+                ;;
+              M3-v1-esp32c3-classicsimple-bootloader.bin)
+                dest="M3-v1-esp32c3-classicsimple-bootloader.bin"
+                ;;
+              M3-v1-esp32c3-classicsimple-partition-table.bin)
+                dest="M3-v1-esp32c3-classicsimple-partition-table.bin"
+                ;;
+              M3-v1-esp32c3-classicsimple-config.toml.example)
+                dest="M3-v1-esp32c3-classicsimple-config.toml.example"
+                ;;
+              M3-v1-esp32c3-classicsimple-sdkconfig.defaults)
+                dest="M3-v1-esp32c3-classicsimple-sdkconfig.defaults"
+                ;;
+              M3-v1-esp32c3-classicsimple-partitions.csv)
+                dest="M3-v1-esp32c3-classicsimple-partitions.csv"
+                ;;
+              m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf)
+                dest="M3-v1-esp32c3-classicsimple-firmware.elf"
+                ;;
+              partition-table.bin)
+                dest="M3-v1-esp32c3-classicsimple-partition-table.bin"
+                ;;
+              bootloader.bin)
+                dest="M3-v1-esp32c3-classicsimple-bootloader.bin"
+                ;;
+              config.toml.example)
+                dest="M3-v1-esp32c3-classicsimple-config.toml.example"
+                ;;
+              sdkconfig.defaults)
+                dest="M3-v1-esp32c3-classicsimple-sdkconfig.defaults"
+                ;;
+              partitions.csv)
+                dest="M3-v1-esp32c3-classicsimple-partitions.csv"
+                ;;
+              *.msi)
+                dest="m1-3-app-windows-x64.msi"
+                ;;
+              *.dmg)
+                dest="m1-3-app-macos.dmg"
+                ;;
+              *-ios-simulator.app.ipa)
+                dest="m1-3-app-ios-simulator.app.ipa"
+                ;;
+              *.aab)
+                dest="m1-3-app-android.aab"
+                ;;
+              *universal*.apk)
+                dest="m1-3-app-android-universal.apk"
+                ;;
+              *arm64-v8a*.apk|*aarch64*.apk)
+                dest="m1-3-app-android-arm64-v8a.apk"
+                ;;
+              *armeabi-v7a*.apk|*armv7*.apk)
+                dest="m1-3-app-android-armeabi-v7a.apk"
+                ;;
+              *x86_64*.apk)
+                dest="m1-3-app-android-x86_64.apk"
+                ;;
+              *)
+                echo "未识别的资产文件名: ${base}" >&2
+                exit 1
+                ;;
+            esac
+
+            cp -f "$src" "${final_dir}/${dest}"
+          }
+
+          while IFS= read -r file; do
+            normalize_asset "${file}"
+          done < <(find "${raw_dir}" -maxdepth 1 -type f | sort)
+
+          (
+            cd "${final_dir}"
+            sha256sum * > SHA256SUMS.txt
+          )
+
+          while IFS= read -r asset_id; do
+            gh api -X DELETE "repos/${PRIVATE_RELEASE_REPO}/releases/assets/${asset_id}"
+          done < <(gh api "repos/${PRIVATE_RELEASE_REPO}/releases/tags/${release_tag}" --jq '.assets[].id')
+
+          gh release upload "${release_tag}" "${final_dir}"/* -R "${PRIVATE_RELEASE_REPO}" --clobber
+
   publish-release:
     name: Publish collected public release artifacts
     runs-on: ubuntu-latest
