@@ -1162,6 +1162,7 @@ jobs:
         working-directory: workspace/m3-v1
         shell: bash
         env:
+          CARGO_WORKSPACE_DIR: ${{ github.workspace }}/workspace/m3-v1
           ESP_IDF_SDKCONFIG: ${{ github.workspace }}/workspace/m3-v1/sdkconfig
           ESP_IDF_SDKCONFIG_DEFAULTS: ${{ github.workspace }}/workspace/m3-v1/sdkconfig.defaults
         run: |
