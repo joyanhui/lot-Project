@@ -229,17 +229,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/m1-3-app-linux-x86_64.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/m1-3-app-linux-x86_64.gz
 
   build-windows:
     name: Build m1-3-app Windows (.msi)
@@ -320,14 +313,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" /tmp/release/m1-3-app-windows-x64.msi -R "${PRIVATE_RELEASE_REPO}" --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/m1-3-app-windows-x64.msi
 
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
@@ -447,14 +436,10 @@ jobs:
             } | sort
           )
           ((${#files[@]} > 0))
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" "${files[@]}" -R "${PRIVATE_RELEASE_REPO}" --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            "${files[@]}"
 
   build-android:
     name: Build m1-3-app Android (.apk)
@@ -624,14 +609,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" /tmp/release/android/* -R "${PRIVATE_RELEASE_REPO}" --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/android/*
 
   build-m1-2-device-init-reg-proxy-linux-x86_64:
     name: Build m1-2-device-init-reg-proxy Linux x86_64 .gz
@@ -697,17 +678,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m1-1-platform-linux-x86_64:
     name: Build m1-1-platform Linux x86_64 Docker image .tar.gz
@@ -776,10 +750,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }} \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
 
   build-m1-2-device-init-reg-proxy-linux-armv8:
     name: Build m1-2-device-init-reg-proxy Linux armv8 .gz
@@ -845,17 +819,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m2-1-listener-linux-x86_64:
     name: Build m2-1-listener Linux x86_64 .gz
@@ -919,17 +886,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m2-1-listener-linux-armv8:
     name: Build m2-1-listener Linux armv8 .gz
@@ -1004,17 +964,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m2-2-saver-linux-x86_64:
     name: Build m2-2-saver Linux x86_64 .gz
@@ -1078,17 +1031,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m2-2-saver-linux-armv8:
     name: Build m2-2-saver Linux armv8 .gz
@@ -1163,17 +1109,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz \
-            -R "${PRIVATE_RELEASE_REPO}" \
-            --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-esp32c3-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
@@ -1308,14 +1247,10 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          if ! gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
-            if [[ "${{ github.event.inputs.prerelease }}" == 'true' ]]; then
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes ""
-            else
-              gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes ""
-            fi
-          fi
-          gh release upload "${release_tag}" /tmp/release/* -R "${PRIVATE_RELEASE_REPO}" --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/*
 
   finalize-private-release-assets:
     name: Finalize private release assets
@@ -1347,7 +1282,10 @@ jobs:
           raw_dir="$(mktemp -d)"
           final_dir="$(mktemp -d)"
 
-          gh release download "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" -D "${raw_dir}"
+          bash workspace/script/ci/gh-release-retry.sh download \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            "${raw_dir}"
 
           normalize_asset() {
             local src="$1"
@@ -1459,10 +1397,15 @@ jobs:
           )
 
           while IFS= read -r asset_id; do
-            gh api -X DELETE "repos/${PRIVATE_RELEASE_REPO}/releases/assets/${asset_id}"
+            bash workspace/script/ci/gh-release-retry.sh delete-asset \
+              "${PRIVATE_RELEASE_REPO}" \
+              "${asset_id}"
           done < <(gh api "repos/${PRIVATE_RELEASE_REPO}/releases/tags/${release_tag}" --jq '.assets[].id')
 
-          gh release upload "${release_tag}" "${final_dir}"/* -R "${PRIVATE_RELEASE_REPO}" --clobber
+          bash workspace/script/ci/gh-release-retry.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            "${final_dir}"/*
 
   publish-release:
     name: Publish collected public release artifacts
