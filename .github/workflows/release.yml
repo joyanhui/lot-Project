@@ -77,10 +77,72 @@ jobs:
             gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
           fi
 
+  prepare-shared-frontend-assets:
+    name: Build shared frontend assets for m1-1-platform and m1-3-app
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-linux' || github.event.inputs.build_target == 'm1-1-platform-linux-x86_64' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - name: Checkout lot-manager-aio workspace for shared frontend assets
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch shared frontend workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun for shared frontend assets
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies for shared frontend assets
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build shared frontend web assets for m1-1-platform
+        working-directory: workspace/frontend
+        shell: bash
+        run: bun run build:web
+
+      - name: Build shared frontend tauri assets for m1-3-app
+        working-directory: workspace/frontend
+        shell: bash
+        run: bun run build:tauri
+
+      - name: Upload shared frontend web assets for m1-1-platform
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-web-public
+          path: workspace/m1-1-platform/public
+          if-no-files-found: error
+
+      - name: Upload shared frontend tauri assets for m1-3-app
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-tauri-dist
+          path: workspace/m1-3-app/dist
+          if-no-files-found: error
+
   build-linux:
     name: Build m1-3-app Linux x86_64 binary
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -117,25 +179,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Setup Bun for m1-3-app Linux
-        uses: oven-sh/setup-bun@v2
-
       - name: Setup Rust for m1-3-app Linux
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install workspace dependencies for m1-3-app Linux
-        working-directory: workspace
-        shell: bash
-        run: bun install
-
-      - name: Build m1-3 shared frontend for Tauri (Linux)
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build:tauri
+      - name: Download shared frontend tauri assets for m1-3-app Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-tauri-dist
+          path: workspace/m1-3-app/dist
 
       - name: Build m1-3-app Linux x86_64 binary
         working-directory: workspace/m1-3-app
         shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
         run: |
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
@@ -185,7 +242,9 @@ jobs:
   build-windows:
     name: Build m1-3-app Windows (.msi)
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: windows-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -215,25 +274,20 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun for m1-3-app Windows
-        uses: oven-sh/setup-bun@v2
-
       - name: Setup Rust for m1-3-app Windows
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install workspace dependencies for m1-3-app Windows
-        working-directory: workspace
-        shell: bash
-        run: bun install
-
-      - name: Build m1-3 shared frontend for Tauri (Windows)
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build:tauri
+      - name: Download shared frontend tauri assets for m1-3-app Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-tauri-dist
+          path: workspace/m1-3-app/dist
 
       - name: Build m1-3-app Windows .msi
         working-directory: workspace/m1-3-app
         shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
         run: |
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
@@ -270,7 +324,9 @@ jobs:
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -300,9 +356,6 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun for m1-3-app macOS/iOS
-        uses: oven-sh/setup-bun@v2
-
       - name: Setup Rust for m1-3-app macOS/iOS
         uses: dtolnay/rust-toolchain@stable
 
@@ -310,19 +363,17 @@ jobs:
         shell: bash
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 
-      - name: Install workspace dependencies for m1-3-app macOS/iOS
-        working-directory: workspace
-        shell: bash
-        run: bun install
-
-      - name: Build m1-3 shared frontend for Tauri (macOS/iOS)
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build:tauri
+      - name: Download shared frontend tauri assets for m1-3-app macOS/iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-tauri-dist
+          path: workspace/m1-3-app/dist
 
       - name: Build m1-3-app macOS .dmg
         working-directory: workspace/m1-3-app
         shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
         run: |
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
@@ -344,6 +395,8 @@ jobs:
       - name: Build m1-3-app iOS simulator app
         working-directory: workspace/m1-3-app
         shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri ios build --target aarch64-sim --ci
 
       - name: Package m1-3-app iOS simulator .app.ipa artifact
@@ -390,7 +443,9 @@ jobs:
   build-android:
     name: Build m1-3-app Android (.apk)
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -420,9 +475,6 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun for m1-3-app Android
-        uses: oven-sh/setup-bun@v2
-
       - name: Setup Rust for m1-3-app Android
         uses: dtolnay/rust-toolchain@stable
 
@@ -449,15 +501,11 @@ jobs:
           sdkmanager --install "ndk;27.0.12077973" --channel=0
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
-      - name: Install workspace dependencies for m1-3-app Android
-        working-directory: workspace
-        shell: bash
-        run: bun install
-
-      - name: Build m1-3 shared frontend for Tauri (Android)
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build:tauri
+      - name: Download shared frontend tauri assets for m1-3-app Android
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-tauri-dist
+          path: workspace/m1-3-app/dist
 
       - name: Initialize m1-3-app Android project
         working-directory: workspace/m1-3-app
@@ -474,6 +522,8 @@ jobs:
       - name: Build m1-3-app Android APK
         working-directory: workspace/m1-3-app
         shell: bash
+        env:
+          LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri android build --target aarch64 --apk
 
       - name: Sign m1-3-app Android APK
@@ -620,7 +670,9 @@ jobs:
   build-m1-1-platform-linux-x86_64:
     name: Build m1-1-platform Linux x86_64 Docker image .tar.gz
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-linux' || github.event.inputs.build_target == 'm1-1-platform-linux-x86_64' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -651,6 +703,12 @@ jobs:
             git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Download shared frontend web assets for m1-1-platform
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-web-public
+          path: workspace/m1-1-platform/public
 
       - name: Build m1-1-platform Linux x86_64 Docker image
         shell: bash
@@ -1096,7 +1154,6 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
       OUTPUT_NAME: m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf
-      ESP_IDF_VERSION: v5.2.2
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -1155,19 +1212,32 @@ jobs:
         run: |
           set -euo pipefail
           cp config.toml.example config.toml
+          source ../script/export-esp.sh
           bash ../script/prepare-m3-sdkconfig.sh
           cp sdkconfig.defaults sdkconfig
 
       - name: Build m3-v1 esp32c3-classicsimple firmware ELF
         working-directory: workspace/m3-v1
         shell: bash
-        env:
-          ESP_IDF_SDKCONFIG: ${{ github.workspace }}/workspace/m3-v1/sdkconfig
-          ESP_IDF_SDKCONFIG_DEFAULTS: ${{ github.workspace }}/workspace/m3-v1/sdkconfig.defaults
-          ESP_IDF_TOOLS_INSTALL_DIR: custom:${{ github.workspace }}/workspace/m3-v1/.embuild/espressif
         run: |
           set -euo pipefail
-          env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS cargo +nightly build -Zbuild-std=std,panic_abort --release --bin lot-manager-m3-firmware-esp32c3 --target riscv32imc-esp-espidf
+          source ../script/export-esp.sh
+          cp sdkconfig.defaults sdkconfig
+          env \
+            -u RUSTFLAGS \
+            -u CARGO_ENCODED_RUSTFLAGS \
+            -u CARGO_PROFILE_DEV_SPLIT_DEBUGINFO \
+            -u CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO \
+            ESP_IDF_SDKCONFIG="$PWD/sdkconfig" \
+            ESP_IDF_SDKCONFIG_DEFAULTS="$PWD/sdkconfig.defaults" \
+            ESP_IDF_TOOLS_INSTALL_DIR="custom:$PWD/.embuild/espressif" \
+            cargo +nightly build \
+              -Zbuild-std=std,panic_abort \
+              --release \
+              --package lot-manager-m3-firmware \
+              --bin lot-manager-m3-firmware-esp32c3 \
+              --features esp32c3 \
+              --target riscv32imc-esp-espidf
 
       - name: Collect m3-v1 esp32c3-classicsimple firmware artifacts
         shell: bash
@@ -1225,6 +1295,7 @@ jobs:
       - build-windows
       - build-macos
       - build-android
+      - prepare-shared-frontend-assets
       - build-m1-1-platform-linux-x86_64
       - build-m1-2-device-init-reg-proxy-linux-x86_64
       - build-m1-2-device-init-reg-proxy-linux-armv8
