@@ -685,7 +685,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/m1-2-device-init-reg-proxy/dist/${OUTPUT_NAME}"
+          binary_path="workspace/m1-2-device-init-reg-proxy/dist/m1-2-device-init-reg-proxy-x86_64-unknown-linux-gnu"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
@@ -833,7 +833,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/m1-2-device-init-reg-proxy/dist/${OUTPUT_NAME}"
+          binary_path="workspace/m1-2-device-init-reg-proxy/dist/m1-2-device-init-reg-proxy-armv8-unknown-linux-gnu"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
