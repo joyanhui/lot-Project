@@ -73,9 +73,7 @@ jobs:
           bun run --filter @lot-manager/m1-frontend build:web
           env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 \
             cargo build \
-            -p m1-2-device-init-reg-proxy \
-            -p m2-2-saver \
-            -p m2-1-listener
+            -p m2-2-saver
           (
             cd m3-v1
             env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 \
