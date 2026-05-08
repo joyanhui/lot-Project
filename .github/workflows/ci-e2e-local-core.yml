@@ -63,3 +63,18 @@ jobs:
         working-directory: workspace
         shell: bash
         run: bun run test:e2e:local:core
+
+      - name: Run local runtime edge checks
+        working-directory: workspace
+        shell: bash
+        run: bun run test:e2e:local:runtime-edge
+
+      - name: Run shared service crypto checks
+        working-directory: workspace
+        shell: bash
+        run: bun run test:e2e:local:service-crypto
+
+      - name: Run local runtime more checks
+        working-directory: workspace
+        shell: bash
+        run: bun run test:e2e:local:runtime-more
