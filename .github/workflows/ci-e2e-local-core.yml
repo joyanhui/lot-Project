@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 45
     env:
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      M3_DEV_SHADOW_BASE_URL: http://127.0.0.1:19311
+      DEVICE_INIT_PUBLIC_BASE_URL: http://127.0.0.1:19311
+      DEVICE_CONTROL_PUBLIC_BASE_URL: http://127.0.0.1:19332
     steps:
       - name: Checkout private workspace
         uses: actions/checkout@v4
