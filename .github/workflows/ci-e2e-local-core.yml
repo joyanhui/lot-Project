@@ -59,9 +59,26 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
+      - name: Prebuild frontend and Rust runtime artifacts
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run --filter @lot-manager/m1-frontend build:web
+          env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 cargo build -p m1-2-device-init-reg-proxy
+          env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 cargo build -p m2-2-saver
+          env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 cargo build -p m2-1-listener
+          (
+            cd m3-v1
+            env -u CARGO_INCREMENTAL RUSTC_WRAPPER= CARGO_BUILD_JOBS=1 \
+              cargo build --target x86_64-unknown-linux-gnu --no-default-features --features host-sim,esp32c3
+          )
+
       - name: Run local core E2E
         working-directory: workspace
         shell: bash
+        env:
+          LOT_E2E_SKIP_PREBUILD: "true"
         run: bun run test:e2e:local:core
 
       - name: Run local runtime edge checks
