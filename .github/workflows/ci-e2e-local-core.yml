@@ -54,6 +54,12 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
       - name: Install dependencies
         working-directory: workspace
         shell: bash
