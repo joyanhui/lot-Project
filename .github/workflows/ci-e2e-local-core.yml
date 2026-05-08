@@ -1,0 +1,65 @@
+name: CI E2E Local Core
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "要校验的 lot-manager-aio ref（分支 / tag / commit SHA）"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-e2e-local-core-${{ github.event.inputs.source_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run local core E2E
+        working-directory: workspace
+        shell: bash
+        run: bun run test:e2e:local:core
