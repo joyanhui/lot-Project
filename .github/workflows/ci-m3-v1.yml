@@ -43,6 +43,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lot-rust-host
+          workspaces: |
+            workspace -> target
+
       - name: Validate workspace metadata
         working-directory: workspace
         shell: bash
