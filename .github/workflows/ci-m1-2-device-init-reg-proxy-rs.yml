@@ -1,4 +1,4 @@
-name: CI M1-2 Device Init Reg Proxy
+name: CI M1-2 Device Init Reg Proxy RS
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-2-device-init-reg-proxy-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m1-2-device-init-reg-proxy-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -40,25 +40,19 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
-        working-directory: workspace
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Typecheck shared and proxy
+      - name: Check proxy crate
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          bun run --filter @lot-manager/shared typecheck
-          bun run --filter @lot-manager/m1-2-device-init-reg-proxy typecheck
+          cargo check -p m1-2-device-init-reg-proxy-rs
 
       - name: Run proxy tests
         working-directory: workspace
         shell: bash
-        run: bun run --filter @lot-manager/m1-2-device-init-reg-proxy test
+        run: |
+          set -euo pipefail
+          cargo test -p m1-2-device-init-reg-proxy-rs
