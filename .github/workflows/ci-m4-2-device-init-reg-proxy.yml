@@ -1,4 +1,4 @@
-name: CI M1-2 Device Init Reg Proxy
+name: CI M4-2 Device Init Reg Proxy
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-2-device-init-reg-proxy-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m4-2-device-init-reg-proxy-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -48,11 +48,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo check -p m1-2-device-init-reg-proxy
+          cargo check -p m4-2-device-init-reg-proxy
 
       - name: Run proxy tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo test -p m1-2-device-init-reg-proxy
+          cargo test -p m4-2-device-init-reg-proxy
