@@ -46,8 +46,10 @@ on:
           - m4-2-device-init-reg-proxy-linux
           - m4-2-device-init-reg-proxy-linux-x86_64
           - m4-2-device-init-reg-proxy-linux-arm64-musl
-          - m3-v1-esp32c3-classicsimple-firmware
-          - esp32c3-firmware
+           - m3-v1-esp32c3-classicsimple-firmware
+           - lot-manager-aio-docker
+           - lot-manager-aio-x86_64-gnu-docker
+           - lot-manager-aio-aarch64-musl-docker
 
 permissions:
   contents: write
@@ -131,14 +133,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/m1-1-platform/public
+          path: workspace/frontend/dist-cli
           if-no-files-found: error
 
       - name: Upload shared frontend tauri assets for m1-3-app
         uses: actions/upload-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/m1-3-app/dist
+          path: workspace/frontend/dist-tauri
           if-no-files-found: error
 
   build-linux:
@@ -190,7 +192,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/m1-3-app/dist
+          path: workspace/frontend/dist-tauri
 
       - name: Build m1-3-app Linux x86_64 binary
         working-directory: workspace/m1-3-app
@@ -275,7 +277,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/m1-3-app/dist
+          path: workspace/frontend/dist-tauri
 
       - name: Build m1-3-app Windows .msi
         working-directory: workspace/m1-3-app
@@ -363,7 +365,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/m1-3-app/dist
+          path: workspace/frontend/dist-tauri
 
       - name: Build m1-3-app macOS .dmg
         working-directory: workspace/m1-3-app
@@ -505,7 +507,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/m1-3-app/dist
+          path: workspace/frontend/dist-tauri
 
       - name: Initialize m1-3-app Android project
         working-directory: workspace/m1-3-app
@@ -667,6 +669,13 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m4-2-device-init-reg-proxy-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
       - name: Upload m4-2-device-init-reg-proxy x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
@@ -721,7 +730,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/m1-1-platform-rs/public
+          path: workspace/frontend/dist-cli
 
       - name: Setup Rust for m1-1-platform-rs x86_64
         uses: dtolnay/rust-toolchain@stable
@@ -740,11 +749,18 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/m1-1-platform-rs/public "${tar_dir}/public"
+          cp -r workspace/frontend/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
           rm -rf "${tar_dir}"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m1-1-platform-rs-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          if-no-files-found: error
 
       - name: Upload m1-1-platform-rs x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -800,7 +816,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/m1-1-platform-rs/public
+          path: workspace/frontend/dist-cli
 
       - name: Setup Rust for m1-1-platform-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
@@ -826,11 +842,18 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/m1-1-platform-rs/public "${tar_dir}/public"
+          cp -r workspace/frontend/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
           rm -rf "${tar_dir}"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m1-1-platform-rs-arm64-musl
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          if-no-files-found: error
 
       - name: Upload m1-1-platform-rs arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -906,6 +929,13 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m4-2-device-init-reg-proxy-arm64-musl
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
       - name: Upload m4-2-device-init-reg-proxy arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
@@ -972,6 +1002,13 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-1-listener-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
 
       - name: Upload m2-1-listener x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -1047,6 +1084,13 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-1-listener-arm64-musl
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
       - name: Upload m2-1-listener arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
@@ -1113,6 +1157,13 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-telemetry-tracking-and-archive"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-2-telemetry-tracking-and-archive-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
 
       - name: Upload m2-2-telemetry-tracking-and-archive x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -1188,6 +1239,13 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-2-telemetry-tracking-and-archive-arm64-musl
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
       - name: Upload m2-2-telemetry-tracking-and-archive arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
@@ -1254,6 +1312,13 @@ jobs:
           binary_path="workspace/target/${TARGET_TRIPLE}/release/m4-1-inlet-manager"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m4-1-inlet-manager-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
 
       - name: Upload m4-1-inlet-manager x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
@@ -1329,6 +1394,13 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m4-1-inlet-manager-arm64-musl
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
       - name: Upload m4-1-inlet-manager arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
@@ -1342,9 +1414,128 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-esp32c3-firmware:
+  build-lot-manager-aio-x86_64-gnu-docker:
+    name: Build lot-manager-aio x86_64 (debian) combined Docker image
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'lot-manager-aio-docker' || github.event.inputs.build_target == 'lot-manager-aio-x86_64-gnu-docker' || github.event.inputs.build_target == '' }}
+    needs:
+      - prepare-private-release
+      - build-m1-1-platform-rs-linux-x86_64
+      - build-m2-1-listener-linux-x86_64
+      - build-m2-2-telemetry-tracking-and-archive-linux-x86_64
+      - build-m4-1-inlet-manager-linux-x86_64
+      - build-m4-2-device-init-reg-proxy-linux-x86_64
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      OUTPUT_NAME: lot-manager-aio-x86_64-gnu-docker.tar.gz
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for Docker context
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Download m1-1-platform-rs binary and frontend assets
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m1-1-platform-rs-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-1-listener binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-1-listener-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-2-telemetry-tracking-and-archive binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-2-telemetry-tracking-and-archive-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m4-1-inlet-manager binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m4-1-inlet-manager-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m4-2-device-init-reg-proxy binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m4-2-device-init-reg-proxy-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker build context and build image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/docker-context/usr/local/bin /tmp/docker-context/frontend/dist-cli
+
+          tar_dir="$(mktemp -d)"
+          tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
+          mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
+          cp -r "${tar_dir}/public"/* /tmp/docker-context/frontend/dist-cli/
+          rm -rf "${tar_dir}"
+
+          for f in /tmp/docker-artifacts/*.gz; do
+            base="$(basename "$f" .gz)"
+            case "$base" in
+              m1-1-platform-rs-linux-arm64-musl.tar) continue ;;
+            esac
+            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${base}"
+            chmod +x "/tmp/docker-context/usr/local/bin/${base}"
+          done
+
+          chmod +x /tmp/docker-context/usr/local/bin/*
+
+          mkdir -p /tmp/release
+          docker buildx build \
+            --platform linux/arm64 \
+            --output type=docker,dest=/tmp/release/lot-manager-aio-aarch64-musl-docker.tar \
+            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio.alpine \
+            /tmp/docker-context
+
+          gzip -c /tmp/release/lot-manager-aio-aarch64-musl-docker.tar > "/tmp/release/${OUTPUT_NAME}"
+          rm -f /tmp/release/lot-manager-aio-aarch64-musl-docker.tar
+
+      - name: Upload Docker image artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
+
+  build-esp32c3-classicsimple-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'esp32c3-firmware' || github.event.inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1500,7 +1691,9 @@ jobs:
       - build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl
       - build-m4-1-inlet-manager-linux-x86_64
       - build-m4-1-inlet-manager-linux-arm64-musl
-      - build-esp32c3-firmware
+      - build-esp32c3-classicsimple-firmware
+      - build-lot-manager-aio-x86_64-gnu-docker
+      - build-lot-manager-aio-aarch64-musl-docker
     if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Checkout lot-manager-aio workspace for private release finalization
@@ -1639,6 +1832,12 @@ jobs:
                 ;;
               *x86_64*.apk)
                 dest="m1-3-app-android-x86_64.apk"
+                ;;
+              lot-manager-aio-x86_64-gnu-docker.tar.gz)
+                dest="lot-manager-aio-x86_64-gnu-docker.tar.gz"
+                ;;
+              lot-manager-aio-aarch64-musl-docker.tar.gz)
+                dest="lot-manager-aio-aarch64-musl-docker.tar.gz"
                 ;;
               *)
                 echo "未识别的资产文件名: ${base}" >&2
