@@ -60,4 +60,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared -p m2-1-listener -p m2-2-saver
+          env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared -p m2-1-listener -p m2-2-telemetry-tracking-and-archive -p m4-1-inlet-manager

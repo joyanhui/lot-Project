@@ -986,23 +986,23 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-1-listener-linux-armv8:
-    name: Build m2-1-listener Linux armv8 .gz
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-1-listener-linux' || github.event.inputs.build_target == 'm2-1-listener-linux-armv8' || github.event.inputs.build_target == '' }}
+  build-m2-1-listener-linux-arm64-musl:
+    name: Build m2-1-listener Linux arm64 musl .gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm2-1-listener-linux' || github.event.inputs.build_target == 'm2-1-listener-linux-arm64-musl' || github.event.inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      TARGET_TRIPLE: aarch64-unknown-linux-gnu
-      OUTPUT_NAME: m2-1-listener-linux-armv8
+      TARGET_TRIPLE: aarch64-unknown-linux-musl
+      OUTPUT_NAME: m2-1-listener-linux-arm64-musl
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-1-listener armv8
+      - name: Checkout lot-manager-aio workspace for m2-1-listener arm64 musl
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1011,7 +1011,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-1-listener armv8 workspace to requested source ref
+      - name: Switch m2-1-listener arm64 musl workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1021,28 +1021,24 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Install Linux armv8 cross toolchain for m2-1-listener
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-
-      - name: Setup Rust for m2-1-listener armv8
+      - name: Setup Rust for m2-1-listener arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-unknown-linux-gnu
+          targets: aarch64-unknown-linux-musl
 
-      - name: Build m2-1-listener armv8 binary
+      - name: Install cargo-zigbuild for musl
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build m2-1-listener arm64 musl binary
         working-directory: workspace
         shell: bash
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: |
           set -euo pipefail
-          cargo build --release -p m2-1-listener --target "${TARGET_TRIPLE}"
+          cargo zigbuild --release -p m2-1-listener --target "${TARGET_TRIPLE}"
 
-      - name: Collect m2-1-listener armv8 .gz artifacts
+      - name: Collect m2-1-listener arm64 musl .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -1051,7 +1047,7 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
-      - name: Upload m2-1-listener armv8 artifacts to private release
+      - name: Upload m2-1-listener arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
         env:
