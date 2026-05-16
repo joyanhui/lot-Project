@@ -17,12 +17,7 @@ on:
         required: false
         default: true
       publish_release:
-        description: "Publish private GitHub Release after build"
-        type: boolean
-        required: false
-        default: false
-      publish_public_release:
-        description: "Publish public GitHub Release on lot-Project after build"
+        description: "Publish private GitHub Release on lot-manager-aio after build"
         type: boolean
         required: false
         default: false
@@ -33,20 +28,24 @@ on:
         default: "all"
         options:
           - all
-          - m1-1-platform-linux
-          - m1-1-platform-linux-x86_64
           - m1-3-app
           - m1-3-app-android
           - m1-3-app-desktop
-          - m4-2-device-init-reg-proxy-linux
-          - m4-2-device-init-reg-proxy-linux-x86_64
-          - m4-2-device-init-reg-proxy-linux-armv8
+          - m1-1-platform-rs-linux
+          - m1-1-platform-rs-linux-x86_64
+          - m1-1-platform-rs-linux-arm64-musl
           - m2-1-listener-linux
           - m2-1-listener-linux-x86_64
-          - m2-1-listener-linux-armv8
-          - m2-2-saver-linux
-          - m2-2-saver-linux-x86_64
-          - m2-2-saver-linux-armv8
+          - m2-1-listener-linux-arm64-musl
+          - m2-2-telemetry-tracking-and-archive-linux
+          - m2-2-telemetry-tracking-and-archive-linux-x86_64
+          - m2-2-telemetry-tracking-and-archive-linux-arm64-musl
+          - m4-1-inlet-manager-linux
+          - m4-1-inlet-manager-linux-x86_64
+          - m4-1-inlet-manager-linux-arm64-musl
+          - m4-2-device-init-reg-proxy-linux
+          - m4-2-device-init-reg-proxy-linux-x86_64
+          - m4-2-device-init-reg-proxy-linux-arm64-musl
           - m3-v1-esp32c3-classicsimple-firmware
           - esp32c3-firmware
 
@@ -84,7 +83,7 @@ jobs:
 
   prepare-shared-frontend-assets:
     name: Build shared frontend assets for m1-1-platform and m1-3-app
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-linux' || github.event.inputs.build_target == 'm1-1-platform-linux-x86_64' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-rs-linux' || github.event.inputs.build_target == 'm1-1-platform-rs-linux-x86_64' || github.event.inputs.build_target == 'm1-1-platform-rs-linux-arm64-musl' || github.event.inputs.build_target == 'm1-3-app' || github.event.inputs.build_target == 'm1-3-app-android' || github.event.inputs.build_target == 'm1-3-app-desktop' || github.event.inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -229,7 +228,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/m1-3-app-linux-x86_64.gz
@@ -313,7 +312,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/m1-3-app-windows-x64.msi
@@ -436,7 +435,7 @@ jobs:
             } | sort
           )
           ((${#files[@]} > 0))
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${files[@]}"
@@ -609,7 +608,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/android/*
@@ -676,14 +675,14 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m1-1-platform-linux-x86_64:
-    name: Build m1-1-platform Linux x86_64 Docker image .tar.gz
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-linux' || github.event.inputs.build_target == 'm1-1-platform-linux-x86_64' || github.event.inputs.build_target == '' }}
+  build-m1-1-platform-rs-linux-x86_64:
+    name: Build m1-1-platform-rs Linux x86_64 .tar.gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-rs-linux' || github.event.inputs.build_target == 'm1-1-platform-rs-linux-x86_64' || github.event.inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -691,15 +690,15 @@ jobs:
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      IMAGE_NAME: lot-manager-m1-1-platform:x86_64-local-workerd
-      OUTPUT_NAME: m1-1-platform-linux-x86_64-docker-image.tar.gz
+      TARGET_TRIPLE: x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m1-1-platform-rs-linux-x86_64.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-1-platform x86_64
+      - name: Checkout lot-manager-aio workspace for m1-1-platform-rs x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -708,7 +707,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-1-platform x86_64 workspace to requested source ref
+      - name: Switch m1-1-platform-rs x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -718,29 +717,36 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Download shared frontend web assets for m1-1-platform
+      - name: Download shared frontend web assets for m1-1-platform-rs
         uses: actions/download-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/m1-1-platform/public
+          path: workspace/m1-1-platform-rs/public
 
-      - name: Build m1-1-platform Linux x86_64 Docker image
+      - name: Setup Rust for m1-1-platform-rs x86_64
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build m1-1-platform-rs x86_64 binary
+        working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          docker build \
-            -f workspace/m1-1-platform/Dockerfile.local-workerd \
-            -t "${IMAGE_NAME}" \
-            workspace
+          cargo build --release -p m1-1-platform-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m1-1-platform x86_64 Docker image .tar.gz artifacts
+      - name: Collect m1-1-platform-rs x86_64 .tar.gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          docker image save "${IMAGE_NAME}" | gzip > "/tmp/release/${OUTPUT_NAME}"
+          tar_dir="$(mktemp -d)"
+          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
+          cp -r workspace/m1-1-platform-rs/public "${tar_dir}/public"
+          cd "${tar_dir}"
+          tar czf "/tmp/release/${OUTPUT_NAME}" .
+          cd /
+          rm -rf "${tar_dir}"
 
-      - name: Upload m1-1-platform x86_64 artifacts to private release
+      - name: Upload m1-1-platform-rs x86_64 artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
         env:
@@ -748,28 +754,30 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
 
-  build-m4-2-device-init-reg-proxy-linux-armv8:
-    name: Build m4-2-device-init-reg-proxy Linux armv8 .gz
-    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm4-2-device-init-reg-proxy-linux' || github.event.inputs.build_target == 'm4-2-device-init-reg-proxy-linux-armv8' || github.event.inputs.build_target == '' }}
-    needs: prepare-private-release
+  build-m1-1-platform-rs-linux-arm64-musl:
+    name: Build m1-1-platform-rs Linux arm64 musl .tar.gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm1-1-platform-rs-linux' || github.event.inputs.build_target == 'm1-1-platform-rs-linux-arm64-musl' || github.event.inputs.build_target == '' }}
+    needs:
+      - prepare-private-release
+      - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
-      TARGET_TRIPLE: aarch64-unknown-linux-gnu
-      OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-armv8
+      TARGET_TRIPLE: aarch64-unknown-linux-musl
+      OUTPUT_NAME: m1-1-platform-rs-linux-arm64-musl.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m4-2-device-init-reg-proxy armv8
+      - name: Checkout lot-manager-aio workspace for m1-1-platform-rs arm64 musl
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -778,7 +786,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m4-2-device-init-reg-proxy armv8 workspace to requested source ref
+      - name: Switch m1-1-platform-rs arm64 musl workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -788,28 +796,108 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Install Linux armv8 cross toolchain for m4-2-device-init-reg-proxy
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+      - name: Download shared frontend web assets for m1-1-platform-rs
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-web-public
+          path: workspace/m1-1-platform-rs/public
 
-      - name: Setup Rust for m4-2-device-init-reg-proxy armv8
+      - name: Setup Rust for m1-1-platform-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-unknown-linux-gnu
+          targets: aarch64-unknown-linux-musl
 
-      - name: Build m4-2-device-init-reg-proxy Linux armv8 binary
+      - name: Install cargo-zigbuild for musl
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build m1-1-platform-rs arm64 musl binary
         working-directory: workspace
         shell: bash
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: |
           set -euo pipefail
-          cargo build --release -p m4-2-device-init-reg-proxy --target "${TARGET_TRIPLE}"
+          cargo zigbuild --release -p m1-1-platform-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m4-2-device-init-reg-proxy armv8 .gz artifacts
+      - name: Collect m1-1-platform-rs arm64 musl .tar.gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          tar_dir="$(mktemp -d)"
+          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
+          cp -r workspace/m1-1-platform-rs/public "${tar_dir}/public"
+          cd "${tar_dir}"
+          tar czf "/tmp/release/${OUTPUT_NAME}" .
+          cd /
+          rm -rf "${tar_dir}"
+
+      - name: Upload m1-1-platform-rs arm64 musl artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
+
+  build-m4-2-device-init-reg-proxy-linux-arm64-musl:
+    name: Build m4-2-device-init-reg-proxy Linux arm64 musl .gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm4-2-device-init-reg-proxy-linux' || github.event.inputs.build_target == 'm4-2-device-init-reg-proxy-linux-arm64-musl' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      TARGET_TRIPLE: aarch64-unknown-linux-musl
+      OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-arm64-musl
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m4-2-device-init-reg-proxy arm64 musl
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m4-2-device-init-reg-proxy arm64 musl workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust for m4-2-device-init-reg-proxy arm64 musl
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install cargo-zigbuild for musl
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build m4-2-device-init-reg-proxy Linux arm64 musl binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release -p m4-2-device-init-reg-proxy --target "${TARGET_TRIPLE}"
+
+      - name: Collect m4-2-device-init-reg-proxy arm64 musl .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -818,7 +906,7 @@ jobs:
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
-      - name: Upload m4-2-device-init-reg-proxy armv8 artifacts to private release
+      - name: Upload m4-2-device-init-reg-proxy arm64 musl artifacts to private release
         if: ${{ github.event.inputs.publish_release != 'false' }}
         shell: bash
         env:
@@ -826,7 +914,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -893,7 +981,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -971,7 +1059,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1038,7 +1126,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1116,7 +1204,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1254,7 +1342,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ github.event.inputs.release_tag }}"
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/*
@@ -1308,7 +1396,7 @@ jobs:
           raw_dir="$(mktemp -d)"
           final_dir="$(mktemp -d)"
 
-          bash workspace/script/ci/gh-release-retry.sh download \
+          bash workspace/script/ci/gh-release.sh download \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${raw_dir}"
@@ -1426,12 +1514,12 @@ jobs:
           )
 
           while IFS= read -r asset_id; do
-            bash workspace/script/ci/gh-release-retry.sh delete-asset \
+            bash workspace/script/ci/gh-release.sh delete-asset \
               "${PRIVATE_RELEASE_REPO}" \
               "${asset_id}"
           done < <(gh api "repos/${PRIVATE_RELEASE_REPO}/releases/tags/${release_tag}" --jq '.assets[].id')
 
-          bash workspace/script/ci/gh-release-retry.sh upload \
+          bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${final_dir}"/*
