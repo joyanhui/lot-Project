@@ -1686,8 +1686,9 @@ jobs:
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
       - name: Setup Rust nightly for m3-v1 esp32c3-classicsimple
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-05-08
           components: rust-src
 
       - name: Install ldproxy for m3-v1 esp32c3-classicsimple
@@ -1740,8 +1741,7 @@ jobs:
             ESP_IDF_SDKCONFIG="$PWD/sdkconfig" \
             ESP_IDF_SDKCONFIG_DEFAULTS="$PWD/sdkconfig.defaults" \
             ESP_IDF_TOOLS_INSTALL_DIR="custom:$PWD/.embuild/espressif" \
-            cargo +nightly build \
-              -Zbuild-std=std,panic_abort \
+            cargo build \
               --release \
               --package lot-manager-m3-firmware \
               --bin lot-manager-m3-firmware-esp32c3 \
