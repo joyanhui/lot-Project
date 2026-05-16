@@ -3,12 +3,44 @@ name: Release
 on:
   repository_dispatch:
     types: [release-build]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 构建目标
+        default: all
+        type: choice
+        options:
+          - all
+          - lot-manager-aio-docker
+          - lot-manager-aio-x86_64-gnu-docker
+          - lot-manager-aio-aarch64-musl-docker
+          - m1-1-platform-rs
+          - m2-1-listener
+          - m2-2-telemetry-tracking-and-archive
+          - m4-1-inlet-manager
+          - m4-2-device-init-reg-proxy
+          - m3-v1-esp32c3-classicsimple-firmware
+      publish_release:
+        description: 是否发布到 release
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      release_tag:
+        description: 发布 tag（如 v0.1.0）
+        required: true
+        type: string
+      source_ref:
+        description: 源码 ref（如 v0.1.0 或 main）
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event.client_payload.release_tag }}
+  group: release-${{ inputs.release_tag }}
   cancel-in-progress: true
 
 env:
@@ -20,30 +52,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ensure private release exists when publishing
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           if gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1; then
             exit 0
           fi
-          if [[ "${{ github.event.client_payload.prerelease }}" == 'true' ]]; then
-            gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --prerelease --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
-          else
-            gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
-          fi
+          gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
 
   prepare-shared-frontend-assets:
     name: Build shared frontend assets for m1-1-platform and m1-3-app
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux-x86_64' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux-arm64-musl' || github.event.client_payload.build_target == 'm1-3-app' || github.event.client_payload.build_target == 'm1-3-app-android' || github.event.client_payload.build_target == 'm1-3-app-desktop' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-1-platform-rs-linux' || inputs.build_target == 'm1-1-platform-rs-linux-x86_64' || inputs.build_target == 'm1-1-platform-rs-linux-arm64-musl' || inputs.build_target == 'm1-3-app' || inputs.build_target == 'm1-3-app-android' || inputs.build_target == 'm1-3-app-desktop' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
     steps:
       - name: Checkout lot-manager-aio workspace for shared frontend assets
         uses: actions/checkout@v4
@@ -98,14 +126,14 @@ jobs:
 
   build-linux:
     name: Build m1-3-app Linux x86_64 binary
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-3-app' || github.event.client_payload.build_target == 'm1-3-app-desktop' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-3-app' || inputs.build_target == 'm1-3-app-desktop' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -176,13 +204,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload m1-3-app Linux artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -190,14 +218,14 @@ jobs:
 
   build-windows:
     name: Build m1-3-app Windows (.msi)
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-3-app' || github.event.client_payload.build_target == 'm1-3-app-desktop' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-3-app' || inputs.build_target == 'm1-3-app-desktop' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: windows-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -260,13 +288,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload m1-3-app Windows artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -274,14 +302,14 @@ jobs:
 
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-3-app' || github.event.client_payload.build_target == 'm1-3-app-desktop' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-3-app' || inputs.build_target == 'm1-3-app-desktop' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -373,13 +401,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload m1-3-app macOS/iOS artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           files=()
           while IFS= read -r file; do
             files+=("${file}")
@@ -397,14 +425,14 @@ jobs:
 
   build-android:
     name: Build m1-3-app Android (.apk)
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-3-app' || github.event.client_payload.build_target == 'm1-3-app-android' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-3-app' || inputs.build_target == 'm1-3-app-android' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
@@ -556,13 +584,13 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload m1-3-app Android artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -570,12 +598,12 @@ jobs:
 
   build-m4-2-device-init-reg-proxy-linux-x86_64:
     name: Build m4-2-device-init-reg-proxy Linux x86_64 .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm4-2-device-init-reg-proxy-linux' || github.event.client_payload.build_target == 'm4-2-device-init-reg-proxy-linux-x86_64' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm4-2-device-init-reg-proxy-linux' || inputs.build_target == 'm4-2-device-init-reg-proxy-linux-x86_64' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
       OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-x86_64
     steps:
@@ -630,13 +658,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m4-2-device-init-reg-proxy x86_64 artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -644,14 +672,14 @@ jobs:
 
   build-m1-1-platform-rs-linux-x86_64:
     name: Build m1-1-platform-rs Linux x86_64 .tar.gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux-x86_64' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-1-platform-rs-linux' || inputs.build_target == 'm1-1-platform-rs-linux-x86_64' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
       OUTPUT_NAME: m1-1-platform-rs-linux-x86_64.tar.gz
     steps:
@@ -716,13 +744,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m1-1-platform-rs x86_64 artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -730,14 +758,14 @@ jobs:
 
   build-m1-1-platform-rs-linux-arm64-musl:
     name: Build m1-1-platform-rs Linux arm64 musl .tar.gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux' || github.event.client_payload.build_target == 'm1-1-platform-rs-linux-arm64-musl' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm1-1-platform-rs-linux' || inputs.build_target == 'm1-1-platform-rs-linux-arm64-musl' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
       OUTPUT_NAME: m1-1-platform-rs-linux-arm64-musl.tar.gz
     steps:
@@ -809,13 +837,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m1-1-platform-rs arm64 musl artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -823,12 +851,12 @@ jobs:
 
   build-m4-2-device-init-reg-proxy-linux-arm64-musl:
     name: Build m4-2-device-init-reg-proxy Linux arm64 musl .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm4-2-device-init-reg-proxy-linux' || github.event.client_payload.build_target == 'm4-2-device-init-reg-proxy-linux-arm64-musl' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm4-2-device-init-reg-proxy-linux' || inputs.build_target == 'm4-2-device-init-reg-proxy-linux-arm64-musl' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
       OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-arm64-musl
     steps:
@@ -890,13 +918,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m4-2-device-init-reg-proxy arm64 musl artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -904,12 +932,12 @@ jobs:
 
   build-m2-1-listener-linux-x86_64:
     name: Build m2-1-listener Linux x86_64 .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm2-1-listener-linux' || github.event.client_payload.build_target == 'm2-1-listener-linux-x86_64' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm2-1-listener-linux' || inputs.build_target == 'm2-1-listener-linux-x86_64' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
       OUTPUT_NAME: m2-1-listener-linux-x86_64
     steps:
@@ -964,13 +992,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m2-1-listener x86_64 artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -978,12 +1006,12 @@ jobs:
 
   build-m2-1-listener-linux-arm64-musl:
     name: Build m2-1-listener Linux arm64 musl .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm2-1-listener-linux' || github.event.client_payload.build_target == 'm2-1-listener-linux-arm64-musl' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm2-1-listener-linux' || inputs.build_target == 'm2-1-listener-linux-arm64-musl' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
       OUTPUT_NAME: m2-1-listener-linux-arm64-musl
     steps:
@@ -1045,13 +1073,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m2-1-listener arm64 musl artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1059,12 +1087,12 @@ jobs:
 
   build-m2-2-telemetry-tracking-and-archive-linux-x86_64:
     name: Build m2-2-telemetry-tracking-and-archive Linux x86_64 .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm2-2-telemetry-tracking-and-archive-linux' || github.event.client_payload.build_target == 'm2-2-telemetry-tracking-and-archive-linux-x86_64' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm2-2-telemetry-tracking-and-archive-linux' || inputs.build_target == 'm2-2-telemetry-tracking-and-archive-linux-x86_64' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
       OUTPUT_NAME: m2-2-telemetry-tracking-and-archive-linux-x86_64
     steps:
@@ -1119,13 +1147,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m2-2-telemetry-tracking-and-archive x86_64 artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1133,12 +1161,12 @@ jobs:
 
   build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl:
     name: Build m2-2-telemetry-tracking-and-archive Linux arm64 musl .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm2-2-telemetry-tracking-and-archive-linux' || github.event.client_payload.build_target == 'm2-2-telemetry-tracking-and-archive-linux-arm64-musl' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm2-2-telemetry-tracking-and-archive-linux' || inputs.build_target == 'm2-2-telemetry-tracking-and-archive-linux-arm64-musl' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
       OUTPUT_NAME: m2-2-telemetry-tracking-and-archive-linux-arm64-musl
     steps:
@@ -1200,13 +1228,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m2-2-telemetry-tracking-and-archive arm64 musl artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1214,12 +1242,12 @@ jobs:
 
   build-m4-1-inlet-manager-linux-x86_64:
     name: Build m4-1-inlet-manager Linux x86_64 .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm4-1-inlet-manager-linux' || github.event.client_payload.build_target == 'm4-1-inlet-manager-linux-x86_64' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm4-1-inlet-manager-linux' || inputs.build_target == 'm4-1-inlet-manager-linux-x86_64' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
       OUTPUT_NAME: m4-1-inlet-manager-linux-x86_64
     steps:
@@ -1274,13 +1302,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m4-1-inlet-manager x86_64 artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1288,12 +1316,12 @@ jobs:
 
   build-m4-1-inlet-manager-linux-arm64-musl:
     name: Build m4-1-inlet-manager Linux arm64 musl .gz
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm4-1-inlet-manager-linux' || github.event.client_payload.build_target == 'm4-1-inlet-manager-linux-arm64-musl' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm4-1-inlet-manager-linux' || inputs.build_target == 'm4-1-inlet-manager-linux-arm64-musl' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
       OUTPUT_NAME: m4-1-inlet-manager-linux-arm64-musl
     steps:
@@ -1355,13 +1383,13 @@ jobs:
           if-no-files-found: error
 
       - name: Upload m4-1-inlet-manager arm64 musl artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1369,7 +1397,7 @@ jobs:
 
   build-lot-manager-aio-x86_64-gnu-docker:
     name: Build lot-manager-aio x86_64 (debian) combined Docker image
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'lot-manager-aio-docker' || github.event.client_payload.build_target == 'lot-manager-aio-x86_64-gnu-docker' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'lot-manager-aio-docker' || inputs.build_target == 'lot-manager-aio-x86_64-gnu-docker' || inputs.build_target == '' }}
     needs:
       - prepare-private-release
       - build-m1-1-platform-rs-linux-x86_64
@@ -1380,7 +1408,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       OUTPUT_NAME: lot-manager-aio-x86_64-gnu-docker.tar.gz
     steps:
       - name: Checkout lot-Project repo
@@ -1447,6 +1475,125 @@ jobs:
           mkdir -p /tmp/docker-context/usr/local/bin /tmp/docker-context/frontend/dist-cli
 
           tar_dir="$(mktemp -d)"
+          tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-x86_64.tar.gz -C "${tar_dir}"
+          mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
+          cp -r "${tar_dir}/public"/* /tmp/docker-context/frontend/dist-cli/
+          rm -rf "${tar_dir}"
+
+          for f in /tmp/docker-artifacts/*.gz; do
+            base="$(basename "$f" .gz)"
+            case "$base" in
+              m1-1-platform-rs-linux-x86_64.tar) continue ;;
+            esac
+            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${base}"
+            chmod +x "/tmp/docker-context/usr/local/bin/${base}"
+          done
+
+          chmod +x /tmp/docker-context/usr/local/bin/*
+
+          mkdir -p /tmp/release
+          docker buildx build \
+            --platform linux/amd64 \
+            --output type=docker,dest=/tmp/release/lot-manager-aio-x86_64-gnu-docker.tar \
+            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio.debian \
+            /tmp/docker-context
+
+          gzip -c /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar > "/tmp/release/${OUTPUT_NAME}"
+          rm -f /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar
+
+      - name: Upload Docker image artifacts to private release
+        if: ${{ inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ inputs.release_tag }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
+
+  build-lot-manager-aio-aarch64-musl-docker:
+    name: Build lot-manager-aio aarch64 (alpine) combined Docker image
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'lot-manager-aio-docker' || inputs.build_target == 'lot-manager-aio-aarch64-musl-docker' || inputs.build_target == '' }}
+    needs:
+      - prepare-private-release
+      - build-m1-1-platform-rs-linux-arm64-musl
+      - build-m2-1-listener-linux-arm64-musl
+      - build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl
+      - build-m4-1-inlet-manager-linux-arm64-musl
+      - build-m4-2-device-init-reg-proxy-linux-arm64-musl
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ inputs.source_ref }}
+      OUTPUT_NAME: lot-manager-aio-aarch64-musl-docker.tar.gz
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for Docker context
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Download m1-1-platform-rs binary and frontend assets
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m1-1-platform-rs-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-1-listener binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-1-listener-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-2-telemetry-tracking-and-archive binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-2-telemetry-tracking-and-archive-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Download m4-1-inlet-manager binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m4-1-inlet-manager-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Download m4-2-device-init-reg-proxy binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m4-2-device-init-reg-proxy-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare Docker build context and build image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/docker-context/usr/local/bin /tmp/docker-context/frontend/dist-cli
+
+          tar_dir="$(mktemp -d)"
           tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
           mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
           cp -r "${tar_dir}/public"/* /tmp/docker-context/frontend/dist-cli/
@@ -1474,13 +1621,13 @@ jobs:
           rm -f /tmp/release/lot-manager-aio-aarch64-musl-docker.tar
 
       - name: Upload Docker image artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1488,12 +1635,12 @@ jobs:
 
   build-esp32c3-classicsimple-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
-    if: ${{ github.event.client_payload.build_target == 'all' || github.event.client_payload.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.client_payload.build_target == '' }}
+    if: ${{ inputs.build_target == 'all' || inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || inputs.build_target == '' }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      SOURCE_REF: ${{ github.event.client_payload.source_ref }}
+      SOURCE_REF: ${{ inputs.source_ref }}
       OUTPUT_NAME: M3-v1-esp32c3-classicsimple-firmware.elf
     steps:
       - name: Checkout lot-Project repo
@@ -1612,13 +1759,13 @@ jobs:
           cp workspace/m3-v1/partitions.csv /tmp/release/M3-v1-esp32c3-classicsimple-partitions.csv
 
       - name: Upload m3-v1 esp32c3-classicsimple firmware artifacts to private release
-        if: ${{ github.event.client_payload.publish_release != 'false' }}
+        if: ${{ inputs.publish_release != 'false' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           bash workspace/script/ci/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
@@ -1647,7 +1794,7 @@ jobs:
       - build-esp32c3-classicsimple-firmware
       - build-lot-manager-aio-x86_64-gnu-docker
       - build-lot-manager-aio-aarch64-musl-docker
-    if: always() && github.event.client_payload.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: always() && inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
       - name: Checkout lot-manager-aio workspace for private release finalization
         uses: actions/checkout@v4
@@ -1662,7 +1809,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source_ref="${{ github.event.client_payload.source_ref }}"
+          source_ref="${{ inputs.source_ref }}"
           if [[ -n "${source_ref}" ]]; then
             git fetch --all --tags --prune
             git checkout "${source_ref}"
@@ -1674,7 +1821,7 @@ jobs:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.client_payload.release_tag }}"
+          release_tag="${{ inputs.release_tag }}"
           raw_dir="$(mktemp -d)"
           final_dir="$(mktemp -d)"
 
