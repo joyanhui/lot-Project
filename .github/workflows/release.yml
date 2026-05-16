@@ -1201,6 +1201,147 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
+  build-m4-1-inlet-manager-linux-x86_64:
+    name: Build m4-1-inlet-manager Linux x86_64 .gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm4-1-inlet-manager-linux' || github.event.inputs.build_target == 'm4-1-inlet-manager-linux-x86_64' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      TARGET_TRIPLE: x86_64-unknown-linux-gnu
+      OUTPUT_NAME: m4-1-inlet-manager-linux-x86_64
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m4-1-inlet-manager x86_64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m4-1-inlet-manager x86_64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust for m4-1-inlet-manager x86_64
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build m4-1-inlet-manager x86_64 binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p m4-1-inlet-manager --target "${TARGET_TRIPLE}"
+
+      - name: Collect m4-1-inlet-manager x86_64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m4-1-inlet-manager"
+          test -f "${binary_path}"
+          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload m4-1-inlet-manager x86_64 artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
+  build-m4-1-inlet-manager-linux-arm64-musl:
+    name: Build m4-1-inlet-manager Linux arm64 musl .gz
+    if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'm4-1-inlet-manager-linux' || github.event.inputs.build_target == 'm4-1-inlet-manager-linux-arm64-musl' || github.event.inputs.build_target == '' }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+      TARGET_TRIPLE: aarch64-unknown-linux-musl
+      OUTPUT_NAME: m4-1-inlet-manager-linux-arm64-musl
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m4-1-inlet-manager arm64 musl
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m4-1-inlet-manager arm64 musl workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust for m4-1-inlet-manager arm64 musl
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Install cargo-zigbuild for musl
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build m4-1-inlet-manager arm64 musl binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo zigbuild --release -p m4-1-inlet-manager --target "${TARGET_TRIPLE}"
+
+      - name: Collect m4-1-inlet-manager arm64 musl .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m4-1-inlet-manager"
+          test -f "${binary_path}"
+          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload m4-1-inlet-manager arm64 musl artifacts to private release
+        if: ${{ github.event.inputs.publish_release != 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.inputs.release_tag }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
   build-esp32c3-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
     if: ${{ github.event.inputs.build_target == 'all' || github.event.inputs.build_target == 'esp32c3-firmware' || github.event.inputs.build_target == 'm3-v1-esp32c3-classicsimple-firmware' || github.event.inputs.build_target == '' }}
@@ -1349,13 +1490,16 @@ jobs:
       - build-macos
       - build-android
       - prepare-shared-frontend-assets
-      - build-m1-1-platform-linux-x86_64
+      - build-m1-1-platform-rs-linux-x86_64
+      - build-m1-1-platform-rs-linux-arm64-musl
       - build-m4-2-device-init-reg-proxy-linux-x86_64
-      - build-m4-2-device-init-reg-proxy-linux-armv8
+      - build-m4-2-device-init-reg-proxy-linux-arm64-musl
       - build-m2-1-listener-linux-x86_64
-      - build-m2-1-listener-linux-armv8
-      - build-m2-2-saver-linux-x86_64
-      - build-m2-2-saver-linux-armv8
+      - build-m2-1-listener-linux-arm64-musl
+      - build-m2-2-telemetry-tracking-and-archive-linux-x86_64
+      - build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl
+      - build-m4-1-inlet-manager-linux-x86_64
+      - build-m4-1-inlet-manager-linux-arm64-musl
       - build-esp32c3-firmware
     if: always() && github.event.inputs.publish_release != 'false' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     steps:
