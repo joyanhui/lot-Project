@@ -40,6 +40,19 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend tauri assets
+        working-directory: workspace/frontend
+        shell: bash
+        run: bun run build:tauri
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
