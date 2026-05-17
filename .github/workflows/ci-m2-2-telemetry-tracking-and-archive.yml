@@ -1,0 +1,70 @@
+name: CI M2-2 Telemetry Tracking And Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "要校验的 lot-manager-aio ref（分支 / tag / commit SHA）"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-m2-2-telemetry-tracking-and-archive-${{ github.event.inputs.source_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lot-rust-host
+          workspaces: |
+            workspace -> target
+
+      - name: Validate workspace metadata
+        working-directory: workspace
+        shell: bash
+        run: cargo metadata --format-version 1 --no-deps
+
+      - name: Check m2-2-telemetry-tracking-and-archive
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p m2-2-telemetry-tracking-and-archive
+
+      - name: Run m2-2-telemetry-tracking-and-archive tests
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo test -p m2-2-telemetry-tracking-and-archive

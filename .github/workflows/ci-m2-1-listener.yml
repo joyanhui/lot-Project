@@ -1,4 +1,4 @@
-name: CI M2 Services
+name: CI M2-1 Listener
 
 on:
   workflow_dispatch:
@@ -12,11 +12,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m2-services-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m2-1-listener-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  check:
+  verify:
     runs-on: ubuntu-latest
     env:
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
@@ -62,9 +62,9 @@ jobs:
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m2-1-listener
 
-      - name: Check m2-2-telemetry-tracking-and-archive
+      - name: Run m2-1-listener tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p m2-2-telemetry-tracking-and-archive
+          env -u CARGO_INCREMENTAL cargo test -p m2-1-listener
