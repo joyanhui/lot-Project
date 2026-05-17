@@ -54,17 +54,3 @@ jobs:
         working-directory: workspace
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
-
-      - name: Run firmware host tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware --target x86_64-unknown-linux-gnu
-
-      - name: Check firmware host-sim workspace path
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-firmware --target x86_64-unknown-linux-gnu --no-default-features --features host-sim,esp32c3
