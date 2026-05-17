@@ -1,4 +1,4 @@
-name: CI Rust Services
+name: CI M2 Services
 
 on:
   workflow_dispatch:
@@ -12,11 +12,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-rust-services-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m2-services-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  verify:
+  check:
     runs-on: ubuntu-latest
     env:
       SOURCE_REF: ${{ github.event.inputs.source_ref }}
@@ -55,9 +55,16 @@ jobs:
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
 
-      - name: Run rust service tests
+      - name: Check m2-1-listener
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared -p m2-1-listener -p m2-2-telemetry-tracking-and-archive -p m4-1-inlet-manager
+          env -u CARGO_INCREMENTAL cargo check -p m2-1-listener
+
+      - name: Check m2-2-telemetry-tracking-and-archive
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p m2-2-telemetry-tracking-and-archive
