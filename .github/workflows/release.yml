@@ -42,7 +42,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ env.RELEASE_TAG }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.client_payload.release_tag || '' }}
   cancel-in-progress: true
 
 env:
@@ -73,7 +73,7 @@ jobs:
 
   prepare-shared-frontend-assets:
     name: Build shared frontend assets for m1-1-platform and m1-3-app
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-1-platform-rs-linux' || env.BUILD_TARGET == 'm1-1-platform-rs-linux-x86_64' || env.BUILD_TARGET == 'm1-1-platform-rs-linux-arm64-musl' || env.BUILD_TARGET == 'm1-3-app' || env.BUILD_TARGET == 'm1-3-app-android' || env.BUILD_TARGET == 'm1-3-app-desktop' }}
+    if: ${{ contains(fromJSON('["all","m1-1-platform-rs-linux","m1-1-platform-rs-linux-x86_64","m1-1-platform-rs-linux-arm64-musl","m1-3-app","m1-3-app-android","m1-3-app-desktop"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -132,7 +132,7 @@ jobs:
 
   build-linux:
     name: Build m1-3-app Linux x86_64 binary
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-3-app' || env.BUILD_TARGET == 'm1-3-app-desktop' }}
+    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -223,7 +223,7 @@ jobs:
 
   build-windows:
     name: Build m1-3-app Windows (.msi)
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-3-app' || env.BUILD_TARGET == 'm1-3-app-desktop' }}
+    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -306,7 +306,7 @@ jobs:
 
   build-macos:
     name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-3-app' || env.BUILD_TARGET == 'm1-3-app-desktop' }}
+    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -428,7 +428,7 @@ jobs:
 
   build-android:
     name: Build m1-3-app Android (.apk)
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-3-app' || env.BUILD_TARGET == 'm1-3-app-android' }}
+    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-android"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -600,7 +600,7 @@ jobs:
 
   build-m4-2-device-init-reg-proxy-linux-x86_64:
     name: Build m4-2-device-init-reg-proxy Linux x86_64 .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm4-2-device-init-reg-proxy-linux' || env.BUILD_TARGET == 'm4-2-device-init-reg-proxy-linux-x86_64' }}
+    if: ${{ contains(fromJSON('["all","m4-2-device-init-reg-proxy-linux","m4-2-device-init-reg-proxy-linux-x86_64"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -673,7 +673,7 @@ jobs:
 
   build-m1-1-platform-rs-linux-x86_64:
     name: Build m1-1-platform-rs Linux x86_64 .tar.gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-1-platform-rs-linux' || env.BUILD_TARGET == 'm1-1-platform-rs-linux-x86_64' }}
+    if: ${{ contains(fromJSON('["all","m1-1-platform-rs-linux","m1-1-platform-rs-linux-x86_64"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -758,7 +758,7 @@ jobs:
 
   build-m1-1-platform-rs-linux-arm64-musl:
     name: Build m1-1-platform-rs Linux arm64 musl .tar.gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm1-1-platform-rs-linux' || env.BUILD_TARGET == 'm1-1-platform-rs-linux-arm64-musl' }}
+    if: ${{ contains(fromJSON('["all","m1-1-platform-rs-linux","m1-1-platform-rs-linux-arm64-musl"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -853,7 +853,7 @@ jobs:
 
   build-m4-2-device-init-reg-proxy-linux-arm64-musl:
     name: Build m4-2-device-init-reg-proxy Linux arm64 musl .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm4-2-device-init-reg-proxy-linux' || env.BUILD_TARGET == 'm4-2-device-init-reg-proxy-linux-arm64-musl' }}
+    if: ${{ contains(fromJSON('["all","m4-2-device-init-reg-proxy-linux","m4-2-device-init-reg-proxy-linux-arm64-musl"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -936,7 +936,7 @@ jobs:
 
   build-m2-1-listener-linux-x86_64:
     name: Build m2-1-listener Linux x86_64 .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm2-1-listener-linux' || env.BUILD_TARGET == 'm2-1-listener-linux-x86_64' }}
+    if: ${{ contains(fromJSON('["all","m2-1-listener-linux","m2-1-listener-linux-x86_64"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1009,7 +1009,7 @@ jobs:
 
   build-m2-1-listener-linux-arm64-musl:
     name: Build m2-1-listener Linux arm64 musl .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm2-1-listener-linux' || env.BUILD_TARGET == 'm2-1-listener-linux-arm64-musl' }}
+    if: ${{ contains(fromJSON('["all","m2-1-listener-linux","m2-1-listener-linux-arm64-musl"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1092,7 +1092,7 @@ jobs:
 
   build-m2-2-telemetry-tracking-and-archive-linux-x86_64:
     name: Build m2-2-telemetry-tracking-and-archive Linux x86_64 .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm2-2-telemetry-tracking-and-archive-linux' || env.BUILD_TARGET == 'm2-2-telemetry-tracking-and-archive-linux-x86_64' }}
+    if: ${{ contains(fromJSON('["all","m2-2-telemetry-tracking-and-archive-linux","m2-2-telemetry-tracking-and-archive-linux-x86_64"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1165,7 +1165,7 @@ jobs:
 
   build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl:
     name: Build m2-2-telemetry-tracking-and-archive Linux arm64 musl .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm2-2-telemetry-tracking-and-archive-linux' || env.BUILD_TARGET == 'm2-2-telemetry-tracking-and-archive-linux-arm64-musl' }}
+    if: ${{ contains(fromJSON('["all","m2-2-telemetry-tracking-and-archive-linux","m2-2-telemetry-tracking-and-archive-linux-arm64-musl"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1248,7 +1248,7 @@ jobs:
 
   build-m4-1-inlet-manager-linux-x86_64:
     name: Build m4-1-inlet-manager Linux x86_64 .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm4-1-inlet-manager-linux' || env.BUILD_TARGET == 'm4-1-inlet-manager-linux-x86_64' }}
+    if: ${{ contains(fromJSON('["all","m4-1-inlet-manager-linux","m4-1-inlet-manager-linux-x86_64"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1321,7 +1321,7 @@ jobs:
 
   build-m4-1-inlet-manager-linux-arm64-musl:
     name: Build m4-1-inlet-manager Linux arm64 musl .gz
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm4-1-inlet-manager-linux' || env.BUILD_TARGET == 'm4-1-inlet-manager-linux-arm64-musl' }}
+    if: ${{ contains(fromJSON('["all","m4-1-inlet-manager-linux","m4-1-inlet-manager-linux-arm64-musl"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1404,7 +1404,7 @@ jobs:
 
   build-lot-manager-aio-x86_64-gnu-docker:
     name: Build lot-manager-aio x86_64 (debian) combined Docker image
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'lot-manager-aio-docker' || env.BUILD_TARGET == 'lot-manager-aio-x86_64-gnu-docker' }}
+    if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-x86_64-gnu-docker"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - build-m1-1-platform-rs-linux-x86_64
@@ -1522,7 +1522,7 @@ jobs:
 
   build-lot-manager-aio-aarch64-musl-docker:
     name: Build lot-manager-aio aarch64 (alpine) combined Docker image
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'lot-manager-aio-docker' || env.BUILD_TARGET == 'lot-manager-aio-aarch64-musl-docker' }}
+    if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-aarch64-musl-docker"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs:
       - prepare-private-release
       - build-m1-1-platform-rs-linux-arm64-musl
@@ -1643,7 +1643,7 @@ jobs:
 
   build-esp32c3-classicsimple-firmware:
     name: Build m3-v1 esp32c3-classicsimple firmware
-    if: ${{ env.BUILD_TARGET == 'all' || env.BUILD_TARGET == 'm3-v1-esp32c3-classicsimple-firmware' }}
+    if: ${{ contains(fromJSON('["all","m3-v1-esp32c3-classicsimple-firmware"]'), github.event_name == 'workflow_dispatch' && inputs.build_target || github.event.client_payload.build_target || 'all') }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1800,7 +1800,7 @@ jobs:
       - build-esp32c3-classicsimple-firmware
       - build-lot-manager-aio-x86_64-gnu-docker
       - build-lot-manager-aio-aarch64-musl-docker
-    if: always() && env.PUBLISH_RELEASE == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && inputs.publish_release || github.event.client_payload.publish_release || 'true') == 'true') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     steps:
       - name: Checkout lot-manager-aio workspace for private release finalization
         uses: actions/checkout@v4
