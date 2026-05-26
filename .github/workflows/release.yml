@@ -16,8 +16,7 @@ on:
           - m2-1-listener
           - m2-2-telemetry-tracking-and-archive
           - m4-1-inlet-manager
-          - m4-2-device-init-reg-proxy
-          - m3-v1-esp32c3-classicsimple-firmware
+           - m3-v1-esp32c3-classicsimple-firmware
       publish_release:
         description: 是否发布到 release
         default: 'true'
@@ -595,79 +594,6 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/android/*
 
-  build-m4-2-device-init-reg-proxy-linux-x86_64:
-    name: Build m4-2-device-init-reg-proxy Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m4-2-device-init-reg-proxy"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-x86_64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-2-device-init-reg-proxy x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m4-2-device-init-reg-proxy x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m4-2-device-init-reg-proxy x86_64
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build m4-2-device-init-reg-proxy Linux x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release -p m4-2-device-init-reg-proxy --target "${TARGET_TRIPLE}"
-
-      - name: Collect m4-2-device-init-reg-proxy x86_64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m4-2-device-init-reg-proxy"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m4-2-device-init-reg-proxy-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m4-2-device-init-reg-proxy x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
   build-m1-1-platform-rs-linux-x86_64:
     name: Build m1-1-platform-rs Linux x86_64 .tar.gz
     if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
@@ -847,89 +773,6 @@ jobs:
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-m4-2-device-init-reg-proxy-linux-arm64-musl:
-    name: Build m4-2-device-init-reg-proxy Linux arm64 musl .gz
-    if: ${{ contains(fromJSON('["all","m4-2-device-init-reg-proxy"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m4-2-device-init-reg-proxy-linux-arm64-musl
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-2-device-init-reg-proxy arm64 musl
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m4-2-device-init-reg-proxy arm64 musl workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m4-2-device-init-reg-proxy arm64 musl
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-musl
-
-      - name: Install cargo-zigbuild for musl
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-zigbuild
-
-      - name: Setup Zig for musl cross-compilation
-        uses: mlugg/setup-zig@v2
-
-      - name: Build m4-2-device-init-reg-proxy Linux arm64 musl binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo zigbuild --release -p m4-2-device-init-reg-proxy --target "${TARGET_TRIPLE}"
-
-      - name: Collect m4-2-device-init-reg-proxy arm64 musl .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m4-2-device-init-reg-proxy"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m4-2-device-init-reg-proxy-arm64-musl
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m4-2-device-init-reg-proxy arm64 musl artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-m2-1-listener-linux-x86_64:
     name: Build m2-1-listener Linux x86_64 .gz
@@ -1408,7 +1251,6 @@ jobs:
       - build-m2-1-listener-linux-x86_64
       - build-m2-2-telemetry-tracking-and-archive-linux-x86_64
       - build-m4-1-inlet-manager-linux-x86_64
-      - build-m4-2-device-init-reg-proxy-linux-x86_64
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -1460,12 +1302,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: binary-m4-1-inlet-manager-x86_64
-          path: /tmp/docker-artifacts
-
-      - name: Download m4-2-device-init-reg-proxy binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m4-2-device-init-reg-proxy-x86_64
           path: /tmp/docker-artifacts
 
       - name: Set up Docker Buildx
@@ -1526,7 +1362,6 @@ jobs:
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-telemetry-tracking-and-archive-linux-arm64-musl
       - build-m4-1-inlet-manager-linux-arm64-musl
-      - build-m4-2-device-init-reg-proxy-linux-arm64-musl
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -1578,12 +1413,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: binary-m4-1-inlet-manager-arm64-musl
-          path: /tmp/docker-artifacts
-
-      - name: Download m4-2-device-init-reg-proxy binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m4-2-device-init-reg-proxy-arm64-musl
           path: /tmp/docker-artifacts
 
       - name: Set up QEMU for arm64 emulation
@@ -1786,8 +1615,6 @@ jobs:
       - prepare-shared-frontend-assets
       - build-m1-1-platform-rs-linux-x86_64
       - build-m1-1-platform-rs-linux-arm64-musl
-      - build-m4-2-device-init-reg-proxy-linux-x86_64
-      - build-m4-2-device-init-reg-proxy-linux-arm64-musl
       - build-m2-1-listener-linux-x86_64
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-telemetry-tracking-and-archive-linux-x86_64
@@ -1848,12 +1675,6 @@ jobs:
                 ;;
               m1-1-platform-rs-linux-arm64-musl.tar.gz)
                 dest="m1-1-platform-rs-linux-arm64-musl.tar.gz"
-                ;;
-              m4-2-device-init-reg-proxy-linux-x86_64.gz)
-                dest="m4-2-device-init-reg-proxy-linux-x86_64.gz"
-                ;;
-              m4-2-device-init-reg-proxy-linux-arm64-musl.gz)
-                dest="m4-2-device-init-reg-proxy-linux-arm64-musl.gz"
                 ;;
               m2-1-listener-linux-x86_64.gz)
                 dest="m2-1-listener-linux-x86_64.gz"
