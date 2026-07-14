@@ -1243,7 +1243,7 @@ jobs:
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
   build-lot-manager-aio-x86_64-gnu-docker:
-    name: Build lot-manager-aio x86_64 (debian) combined Docker image
+    name: Build lot-manager-aio x86_64 (alpine) combined Docker image
     if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-x86_64-gnu-docker"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
@@ -1324,8 +1324,9 @@ jobs:
             case "$base" in
               m1-1-platform-rs-linux-x86_64.tar) continue ;;
             esac
-            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${base}"
-            chmod +x "/tmp/docker-context/usr/local/bin/${base}"
+            clean_name="${base%-linux-*}"
+            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
+            chmod +x "/tmp/docker-context/usr/local/bin/${clean_name}"
           done
 
           chmod +x /tmp/docker-context/usr/local/bin/*
@@ -1334,7 +1335,7 @@ jobs:
           docker buildx build \
             --platform linux/amd64 \
             --output type=docker,dest=/tmp/release/lot-manager-aio-x86_64-gnu-docker.tar \
-            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio.debian \
+            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio \
             /tmp/docker-context
 
           gzip -c /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar > "/tmp/release/${OUTPUT_NAME}"
@@ -1438,8 +1439,9 @@ jobs:
             case "$base" in
               m1-1-platform-rs-linux-arm64-musl.tar) continue ;;
             esac
-            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${base}"
-            chmod +x "/tmp/docker-context/usr/local/bin/${base}"
+            clean_name="${base%-linux-*}"
+            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
+            chmod +x "/tmp/docker-context/usr/local/bin/${clean_name}"
           done
 
           chmod +x /tmp/docker-context/usr/local/bin/*
@@ -1448,7 +1450,7 @@ jobs:
           docker buildx build \
             --platform linux/arm64 \
             --output type=docker,dest=/tmp/release/lot-manager-aio-aarch64-musl-docker.tar \
-            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio.alpine \
+            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio \
             /tmp/docker-context
 
           gzip -c /tmp/release/lot-manager-aio-aarch64-musl-docker.tar > "/tmp/release/${OUTPUT_NAME}"
