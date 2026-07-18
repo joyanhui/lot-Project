@@ -1331,6 +1331,10 @@ jobs:
 
           chmod +x /tmp/docker-context/usr/local/bin/*
 
+          # 从项目根复制配置文件与入口脚本（不维护 script/ci/docker/ 下的独立副本）
+          cp workspace/config.lot.v1.kdl /tmp/docker-context/config.lot.v1.kdl
+          cp workspace/script/ci/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
+
           mkdir -p /tmp/release
           docker buildx build \
             --platform linux/amd64 \
@@ -1445,6 +1449,10 @@ jobs:
           done
 
           chmod +x /tmp/docker-context/usr/local/bin/*
+
+          # 从项目根复制配置文件与入口脚本（不维护 script/ci/docker/ 下的独立副本）
+          cp workspace/config.lot.v1.kdl /tmp/docker-context/config.lot.v1.kdl
+          cp workspace/script/ci/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
 
           mkdir -p /tmp/release
           docker buildx build \
