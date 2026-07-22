@@ -112,6 +112,11 @@ jobs:
         shell: bash
         run: bun run build:tauri
 
+      - name: Build frontend-next
+        working-directory: workspace/frontend-next
+        shell: bash
+        run: bun run build
+
       - name: Upload shared frontend web assets for m1-1-platform
         uses: actions/upload-artifact@v4
         with:

@@ -49,9 +49,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build frontend web assets
-        working-directory: workspace/frontend
+        working-directory: workspace/frontend-next
         shell: bash
-        run: bun run build:web
+        run: bun run build
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
