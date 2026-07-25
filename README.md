@@ -64,7 +64,7 @@
 手动触发 release：在仓库根目录执行 `release-tag` 命令，创建并推送 tag 即可通过 `.github/workflows/trigger-lot-project-release.yml` 自动调度 release workflow。
 
 ```bash
-bash script/dev.sh release-tag <tag>
+bash script/dev.sh release-tag:create <tag>
 ```
 
 tag 前缀决定 `build_target`：
