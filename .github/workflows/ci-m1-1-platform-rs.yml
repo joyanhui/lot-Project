@@ -49,7 +49,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build frontend web assets
-        working-directory: workspace/frontend-next
+        working-directory: workspace/frontend-app
         shell: bash
         run: bun run build
 

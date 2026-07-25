@@ -48,10 +48,10 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Build frontend tauri assets
-        working-directory: workspace/frontend
+      - name: Build frontend assets
+        working-directory: workspace/frontend-app
         shell: bash
-        run: bun run build:tauri
+        run: bun run build
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
