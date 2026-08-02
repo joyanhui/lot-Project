@@ -103,12 +103,12 @@ jobs:
         run: bun install
 
       - name: Build shared frontend web assets for m1-1-platform
-        working-directory: workspace/frontend
+        working-directory: workspace/frontend-old
         shell: bash
         run: bun run build:web
 
       - name: Build shared frontend tauri assets for m1-3-app
-        working-directory: workspace/frontend
+        working-directory: workspace/frontend-old
         shell: bash
         run: bun run build:tauri
 
@@ -116,14 +116,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/frontend/dist-cli
+          path: workspace/frontend-old/dist-cli
           if-no-files-found: error
 
       - name: Upload shared frontend tauri assets for m1-3-app
         uses: actions/upload-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend/dist-tauri
+          path: workspace/frontend-old/dist-tauri
           if-no-files-found: error
 
   build-linux:
@@ -174,7 +174,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend/dist-tauri
+          path: workspace/frontend-old/dist-tauri
 
       - name: Build m1-3-app Linux x86_64 binary
         working-directory: workspace/m1-3-app
@@ -258,7 +258,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend/dist-tauri
+          path: workspace/frontend-old/dist-tauri
 
       - name: Build m1-3-app Windows .msi
         working-directory: workspace/m1-3-app
@@ -345,7 +345,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend/dist-tauri
+          path: workspace/frontend-old/dist-tauri
 
       - name: Build m1-3-app macOS .dmg
         working-directory: workspace/m1-3-app
@@ -486,7 +486,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend/dist-tauri
+          path: workspace/frontend-old/dist-tauri
 
       - name: Initialize m1-3-app Android project
         working-directory: workspace/m1-3-app
@@ -634,7 +634,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/frontend/dist-cli
+          path: workspace/frontend-old/dist-cli
 
       - name: Setup Rust for m1-1-platform-rs x86_64
         uses: dtolnay/rust-toolchain@stable
@@ -653,7 +653,7 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/frontend/dist-cli "${tar_dir}/public"
+          cp -r workspace/frontend-old/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
@@ -719,7 +719,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-web-public
-          path: workspace/frontend/dist-cli
+          path: workspace/frontend-old/dist-cli
 
       - name: Setup Rust for m1-1-platform-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
@@ -748,7 +748,7 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/frontend/dist-cli "${tar_dir}/public"
+          cp -r workspace/frontend-old/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
