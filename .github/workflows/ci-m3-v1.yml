@@ -54,3 +54,17 @@ jobs:
         working-directory: workspace
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
+
+      - name: Check m3-v1
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-firmware
+
+      - name: Run m3-v1 host tests
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware
