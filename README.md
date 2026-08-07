@@ -35,12 +35,11 @@
 - `m1-1-platform-rs`：构建 M1-1 控制面服务。
 - `m2-1-listener`：构建 M2-1 接入层服务。
 - `m2-2-telemetry-tracking-and-archive`：构建 M2-2 归档查询服务。
-- `m4-1-inlet-manager`：构建 M4 inlet 分发服务。
 - `m3-v1-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
 
 ## 主要产物
 
-- Rust 服务二进制：M1-1、M2-1、M2-2、M4。
+- Rust 服务二进制：M1-1、M2-1、M2-2。
 - M1-3 桌面/移动端资产：Linux、Windows、macOS、Android、iOS simulator 相关包。
 - Docker 镜像或镜像构建资产。
 - M3 ESP32-C3 固件资产。
@@ -76,5 +75,4 @@ tag 前缀决定 `build_target`：
 | `m1-3-app-v0.1.0` | M1-3 桌面/移动端 |
 | `m2-1-listener-v0.1.0` | `m2-1-listener` |
 | `m2-2-telemetry-tracking-and-archive-v0.1.0` | M2-2 归档查询 |
-| `m4-1-inlet-manager-v0.1.0` | `m4-1-inlet-manager` |
 | `m3-v1-firmware-v0.1.0` | ESP32-C3 固件 |
