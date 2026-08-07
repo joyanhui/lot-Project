@@ -76,3 +76,14 @@ jobs:
         run: |
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo test -p m1-1-platform-rs
+
+      - name: Check generated OpenAPI / error-code artifacts
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 script/tools.py openapi
+          git diff --exit-code -- \
+            lot-ts-shared/src/generated/error-codes.ts \
+            frontend/openapi-frontend.json \
+            frontend/src/generated/openapi-frontend.ts

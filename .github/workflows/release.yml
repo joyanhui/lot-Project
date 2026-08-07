@@ -367,7 +367,7 @@ jobs:
       - name: Copy m1-3-app bridge templates to iOS project
         working-directory: workspace/m1-3-app
         shell: bash
-        run: python3 ../script/m1-3/copy-mobile-bridges.py ios
+        run: python3 ../script/m1_3.py bridges ios
 
       - name: Build m1-3-app iOS simulator app
         working-directory: workspace/m1-3-app
@@ -497,7 +497,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 ../script/m1-3/copy-mobile-bridges.py android
+          python3 ../script/m1_3.py bridges android
 
       - name: Build m1-3-app Android universal APK and AAB
         working-directory: workspace/m1-3-app
@@ -1379,7 +1379,7 @@ jobs:
         run: |
           set -euo pipefail
           source ../script/export-esp.sh
-          bash ../script/prepare-m3-sdkconfig.sh
+          python3 ../script/tools.py sdkconfig
           cp sdkconfig.defaults sdkconfig
 
       - name: Build m3-v1 esp32c3-classicsimple firmware ELF
