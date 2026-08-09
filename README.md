@@ -9,7 +9,7 @@
 - `.github/workflows/ci-m1-3-app.yml`：M1-3 Tauri App CI。
 - `.github/workflows/ci-m1-4-wechat-app.yml`：微信小程序 CI。
 - `.github/workflows/ci-m2-1-listener.yml`：M2-1 接入层 CI。
-- `.github/workflows/ci-m2-2-telemetry-tracking-and-archive.yml`：M2-2 归档查询层 CI。
+- `.github/workflows/ci-m2-2-archive-query.yml`：M2-2 归档查询层 CI。
 - `.github/workflows/ci-m3-v1.yml`：M3 固件 CI。
 - `.gitignore`：发布工程忽略规则。
 
@@ -34,7 +34,7 @@
 - `lot-manager-aio-aarch64-musl-docker`：构建 aarch64 musl Docker 目标。
 - `m1-1-platform-rs`：构建 M1-1 控制面服务。
 - `m2-1-listener`：构建 M2-1 接入层服务。
-- `m2-2-telemetry-tracking-and-archive`：构建 M2-2 归档查询服务。
+- `m2-2-archive-query`：构建 M2-2 归档查询服务。
 - `m3-v1-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
 
 ## 主要产物
