@@ -364,11 +364,6 @@ jobs:
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri ios init --ci --skip-targets-install
 
-      - name: Copy m1-3-app bridge templates to iOS project
-        working-directory: workspace/m1-3-app
-        shell: bash
-        run: python3 ../script/m1_3.py bridges ios
-
       - name: Build m1-3-app iOS simulator app
         working-directory: workspace/m1-3-app
         shell: bash
@@ -491,13 +486,6 @@ jobs:
         working-directory: workspace/m1-3-app
         shell: bash
         run: cargo tauri android init --ci --skip-targets-install
-
-      - name: Copy m1-3-app Android bridges
-        working-directory: workspace/m1-3-app
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 ../script/m1_3.py bridges android
 
       - name: Build m1-3-app Android universal APK and AAB
         working-directory: workspace/m1-3-app
@@ -1378,8 +1366,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source ../script/export-esp.sh
-          python3 ../script/tools.py sdkconfig
+          source ../script/dev_bash/export-esp.sh
+          bash ../script/dev_bash/prepare-m3-sdkconfig.sh
           cp sdkconfig.defaults sdkconfig
 
       - name: Build m3-v1 esp32c3-classicsimple firmware ELF
@@ -1387,7 +1375,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source ../script/export-esp.sh
+          source ../script/dev_bash/export-esp.sh
           cp sdkconfig.defaults sdkconfig
           env \
             -u RUSTFLAGS \
