@@ -82,7 +82,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 script/tools.py openapi
+          bun script/tools.ts openapi
           git diff --exit-code -- \
             lot-ts-shared/src/generated/error-codes.ts \
             frontend/openapi-frontend.json \
