@@ -13,6 +13,7 @@ on:
           - lot-manager-aio-x86_64-gnu-docker
           - lot-manager-aio-aarch64-musl-docker
           - m1-1-platform-rs
+          - m1-2-ops-console
           - m2-1-listener
           - m2-2-archive-query
            - m3-v1-esp32c3-classicsimple-firmware
@@ -1614,3 +1615,76 @@ jobs:
             "${final_dir}"/*
 
   # publish-release: 已删除 — 发布资产统一走 finalize-private-release-assets 上传到 lot-manager-aio
+
+  build-m1-2-ops-console-linux-x86_64:
+    name: Build m1-2-ops-console Linux x86_64 .tar.gz
+    if: ${{ contains(fromJSON('["all","m1-2-ops-console"]'), inputs.build_target) }}
+    needs:
+      - prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      OUTPUT_NAME: m1-2-ops-console-linux-x86_64.tar.gz
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m1-2-ops-console
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m1-2-ops-console workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Build m1-2-ops-console SSR bundle
+        working-directory: workspace/m1-2-ops-console
+        shell: bash
+        run: bun run build
+
+      - name: Collect m1-2-ops-console .tar.gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          tar_dir="$(mktemp -d)"
+          cp -r workspace/m1-2-ops-console/build "${tar_dir}/build"
+          cp -r workspace/m1-2-ops-console/package.json "${tar_dir}/package.json"
+          cd "${tar_dir}"
+          tar czf "/tmp/release/${OUTPUT_NAME}" .
+          cd /
+          rm -rf "${tar_dir}"
+
+      - name: Upload m1-2-ops-console artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
