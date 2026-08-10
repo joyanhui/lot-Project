@@ -7,7 +7,6 @@
 - `.github/workflows/release.yml`：手动 release workflow，按 `build_target` 构建并发布资产。
 - `.github/workflows/ci-m1-1-platform-rs.yml`：M1-1 控制面 CI。
 - `.github/workflows/ci-m1-3-app.yml`：M1-3 Tauri App CI。
-- `.github/workflows/ci-m1-4-wechat-app.yml`：微信小程序 CI。
 - `.github/workflows/ci-m2-1-listener.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query.yml`：M2-2 归档查询层 CI。
 - `.github/workflows/ci-m3-v1.yml`：M3 固件 CI。
