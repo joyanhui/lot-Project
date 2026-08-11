@@ -1,5 +1,9 @@
 name: CI M2-2 Archive Query
 
+# m2-2-archive-query 归档查询层：ingest 写入 DuckDB 热库（按天/小时分片），
+# convert 队列用 DuckDB COPY 生成 Parquet，upload 队列 token bucket 限速 multipart 上传主 S3，
+# hotcloud-backup 备份 sealed 热库，cleanup 按保留天数清理，device-status 同步设备活跃状态。
+
 on:
   workflow_dispatch:
     inputs:
