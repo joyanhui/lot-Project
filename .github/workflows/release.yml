@@ -102,22 +102,10 @@ jobs:
         shell: bash
         run: bun install
 
-      - name: Build shared frontend web assets for m1-1-platform
-        working-directory: workspace/frontend-old
-        shell: bash
-        run: bun run build:web
-
       - name: Build shared frontend tauri assets for m1-3-app
         working-directory: workspace/frontend-old
         shell: bash
         run: bun run build:tauri
-
-      - name: Upload shared frontend web assets for m1-1-platform
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-web-public
-          path: workspace/frontend-old/dist-cli
-          if-no-files-found: error
 
       - name: Upload shared frontend tauri assets for m1-3-app
         uses: actions/upload-artifact@v4
@@ -125,6 +113,79 @@ jobs:
           name: frontend-tauri-dist
           path: workspace/frontend-old/dist-tauri
           if-no-files-found: error
+
+  build-frontend-web:
+    name: Build frontend web dist for independent deployment
+    if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      OUTPUT_NAME: frontend-web-dist.tar.gz
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for frontend web assets
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch frontend workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun for frontend web assets
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies for frontend web assets
+        working-directory: workspace
+        shell: bash
+        run: bun install
+
+      - name: Build frontend web dist
+        working-directory: workspace/frontend
+        shell: bash
+        run: bun run build
+
+      - name: Collect frontend web dist artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          tar czf "/tmp/release/${OUTPUT_NAME}" -C workspace/frontend/dist .
+
+      - name: Upload frontend web dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-web-dist
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          if-no-files-found: error
+
+      - name: Upload frontend web dist artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}
 
   build-linux:
     name: Build m1-3-app Linux x86_64 binary
@@ -585,9 +646,7 @@ jobs:
   build-m1-1-platform-rs-linux-x86_64:
     name: Build m1-1-platform-rs Linux x86_64 .tar.gz
     if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -618,12 +677,6 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Download shared frontend web assets for m1-1-platform-rs
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-web-public
-          path: workspace/frontend-old/dist-cli
-
       - name: Setup Rust for m1-1-platform-rs x86_64
         uses: dtolnay/rust-toolchain@stable
 
@@ -641,7 +694,6 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/frontend-old/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
@@ -670,9 +722,7 @@ jobs:
   build-m1-1-platform-rs-linux-arm64-musl:
     name: Build m1-1-platform-rs Linux arm64 musl .tar.gz
     if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
+    needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -703,12 +753,6 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Download shared frontend web assets for m1-1-platform-rs
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-web-public
-          path: workspace/frontend-old/dist-cli
-
       - name: Setup Rust for m1-1-platform-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -736,7 +780,6 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
-          cp -r workspace/frontend-old/dist-cli "${tar_dir}/public"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
@@ -1137,12 +1180,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/docker-context/usr/local/bin /tmp/docker-context/frontend/dist-cli
+          mkdir -p /tmp/docker-context/usr/local/bin
 
           tar_dir="$(mktemp -d)"
           tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-x86_64.tar.gz -C "${tar_dir}"
           mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
-          cp -r "${tar_dir}/public"/* /tmp/docker-context/frontend/dist-cli/
           rm -rf "${tar_dir}"
 
           for f in /tmp/docker-artifacts/*.gz; do
@@ -1250,12 +1292,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/docker-context/usr/local/bin /tmp/docker-context/frontend/dist-cli
+          mkdir -p /tmp/docker-context/usr/local/bin
 
           tar_dir="$(mktemp -d)"
           tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
           mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
-          cp -r "${tar_dir}/public"/* /tmp/docker-context/frontend/dist-cli/
           rm -rf "${tar_dir}"
 
           for f in /tmp/docker-artifacts/*.gz; do
