@@ -1711,6 +1711,7 @@ jobs:
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
           cp -r workspace/m1-2-ops-console/build "${tar_dir}/build"
+          cp -r workspace/m1-2-ops-console/src/server "${tar_dir}/src/server"
           cp -r workspace/m1-2-ops-console/package.json "${tar_dir}/package.json"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
