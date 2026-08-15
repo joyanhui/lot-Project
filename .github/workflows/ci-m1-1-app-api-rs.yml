@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-1-platform-rs-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m1-1-app-api-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -63,12 +63,12 @@ jobs:
           workspaces: |
             workspace -> target
 
-      - name: Check m1-1-platform-rs
+      - name: Check m1-1-app-api-rs
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p m1-1-platform-rs
+          env -u CARGO_INCREMENTAL cargo check -p m1-1-app-api-rs
 
       - name: Run lot-rust-shared tests (incl. json5 config integration)
         working-directory: workspace
@@ -77,12 +77,12 @@ jobs:
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared
 
-      - name: Run m1-1-platform-rs tests
+      - name: Run m1-1-app-api-rs tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m1-1-platform-rs
+          env -u CARGO_INCREMENTAL cargo test -p m1-1-app-api-rs
 
       - name: Check generated OpenAPI / error-code artifacts
         working-directory: workspace

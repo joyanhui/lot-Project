@@ -5,7 +5,7 @@
 ## 目录结构
 
 - `.github/workflows/release.yml`：手动 release workflow，按 `build_target` 构建并发布资产。
-- `.github/workflows/ci-m1-1-platform-rs.yml`：M1-1 控制面 CI。
+- `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
 - `.github/workflows/ci-m1-3-app.yml`：M1-3 Tauri App CI。
 - `.github/workflows/ci-m2-1-listener.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query.yml`：M2-2 归档查询层 CI。
@@ -31,7 +31,7 @@
 - `lot-manager-aio-docker`：构建整包 Docker 目标。
 - `lot-manager-aio-x86_64-gnu-docker`：构建 x86_64 GNU Docker 目标。
 - `lot-manager-aio-aarch64-musl-docker`：构建 aarch64 musl Docker 目标。
-- `m1-1-platform-rs`：构建 M1-1 控制面服务。
+- `m1-1-app-api-rs`：构建 M1-1 控制面服务。
 - `m2-1-listener`：构建 M2-1 接入层服务。
 - `m2-2-archive-query`：构建 M2-2 归档查询服务。
 - `m3-v1-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
@@ -72,7 +72,7 @@ tag 前缀决定 `build_target`：
 │ tag 示例                                 │ 构建目标               │
 ├──────────────────────────────────────────┼────────────────────────┤
 │ v0.1.0                                   │ all（全部资产）        │
-│ m1-1-platform-rs-v0.1.0                  │ m1-1-platform-rs       │
+│ m1-1-app-api-rs-v0.1.0                  │ m1-1-app-api-rs       │
 │ m1-3-app-v0.1.0                          │ M1-3 桌面/移动端       │
 │ m2-1-listener-v0.1.0                     │ m2-1-listener          │
 │ m2-2-...archive-v0.1.0                   │ M2-2 归档查询          │

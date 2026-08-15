@@ -12,7 +12,7 @@ on:
           - lot-manager-aio-docker
           - lot-manager-aio-x86_64-gnu-docker
           - lot-manager-aio-aarch64-musl-docker
-          - m1-1-platform-rs
+          - m1-1-app-api-rs
           - m1-2-ops-console
           - m2-1-listener
           - m2-2-archive-query
@@ -69,7 +69,7 @@ jobs:
 
   prepare-shared-frontend-assets:
     name: Build shared frontend assets for m1-1-platform and m1-3-app
-    if: ${{ contains(fromJSON('["all","m1-1-platform-rs","m1-3-app","m1-3-app-android","m1-3-app-desktop"]'), inputs.build_target) }}
+    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs","m1-3-app","m1-3-app-android","m1-3-app-desktop"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -116,7 +116,7 @@ jobs:
 
   build-frontend-web:
     name: Build frontend web dist for independent deployment
-    if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
+    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -643,22 +643,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/android/*
 
-  build-m1-1-platform-rs-linux-x86_64:
-    name: Build m1-1-platform-rs Linux x86_64 .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
+  build-m1-1-app-api-rs-linux-x86_64:
+    name: Build m1-1-app-api-rs Linux x86_64 .tar.gz
+    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m1-1-platform-rs-linux-x86_64.tar.gz
+      OUTPUT_NAME: m1-1-app-api-rs-linux-x86_64.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-1-platform-rs x86_64
+      - name: Checkout lot-manager-aio workspace for m1-1-app-api-rs x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -667,7 +667,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-1-platform-rs x86_64 workspace to requested source ref
+      - name: Switch m1-1-app-api-rs x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -677,23 +677,23 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m1-1-platform-rs x86_64
+      - name: Setup Rust for m1-1-app-api-rs x86_64
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build m1-1-platform-rs x86_64 binary
+      - name: Build m1-1-app-api-rs x86_64 binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release -p m1-1-platform-rs --target "${TARGET_TRIPLE}"
+          cargo build --release -p m1-1-app-api-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m1-1-platform-rs x86_64 .tar.gz artifacts
+      - name: Collect m1-1-app-api-rs x86_64 .tar.gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
-          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
+          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-app-api-rs" "${tar_dir}/"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
@@ -702,11 +702,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m1-1-platform-rs-x86_64
+          name: binary-m1-1-app-api-rs-x86_64
           path: /tmp/release/${{ env.OUTPUT_NAME }}
           if-no-files-found: error
 
-      - name: Upload m1-1-platform-rs x86_64 artifacts to private release
+      - name: Upload m1-1-app-api-rs x86_64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -719,22 +719,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
 
-  build-m1-1-platform-rs-linux-arm64-musl:
-    name: Build m1-1-platform-rs Linux arm64 musl .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-1-platform-rs"]'), inputs.build_target) }}
+  build-m1-1-app-api-rs-linux-arm64-musl:
+    name: Build m1-1-app-api-rs Linux arm64 musl .tar.gz
+    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m1-1-platform-rs-linux-arm64-musl.tar.gz
+      OUTPUT_NAME: m1-1-app-api-rs-linux-arm64-musl.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-1-platform-rs arm64 musl
+      - name: Checkout lot-manager-aio workspace for m1-1-app-api-rs arm64 musl
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -743,7 +743,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-1-platform-rs arm64 musl workspace to requested source ref
+      - name: Switch m1-1-app-api-rs arm64 musl workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -753,7 +753,7 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m1-1-platform-rs arm64 musl
+      - name: Setup Rust for m1-1-app-api-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-unknown-linux-musl
@@ -766,20 +766,20 @@ jobs:
       - name: Setup Zig for musl cross-compilation
         uses: mlugg/setup-zig@v2
 
-      - name: Build m1-1-platform-rs arm64 musl binary
+      - name: Build m1-1-app-api-rs arm64 musl binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo zigbuild --release -p m1-1-platform-rs --target "${TARGET_TRIPLE}"
+          cargo zigbuild --release -p m1-1-app-api-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m1-1-platform-rs arm64 musl .tar.gz artifacts
+      - name: Collect m1-1-app-api-rs arm64 musl .tar.gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
-          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-platform-rs" "${tar_dir}/"
+          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-app-api-rs" "${tar_dir}/"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
@@ -788,11 +788,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m1-1-platform-rs-arm64-musl
+          name: binary-m1-1-app-api-rs-arm64-musl
           path: /tmp/release/${{ env.OUTPUT_NAME }}
           if-no-files-found: error
 
-      - name: Upload m1-1-platform-rs arm64 musl artifacts to private release
+      - name: Upload m1-1-app-api-rs arm64 musl artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1122,7 +1122,7 @@ jobs:
     if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-x86_64-gnu-docker"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
-      - build-m1-1-platform-rs-linux-x86_64
+      - build-m1-1-app-api-rs-linux-x86_64
       - build-m2-1-listener-linux-x86_64
       - build-m2-2-archive-query-linux-x86_64
     runs-on: ubuntu-latest
@@ -1154,10 +1154,10 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Download m1-1-platform-rs binary and frontend assets
+      - name: Download m1-1-app-api-rs binary and frontend assets
         uses: actions/download-artifact@v4
         with:
-          name: binary-m1-1-platform-rs-x86_64
+          name: binary-m1-1-app-api-rs-x86_64
           path: /tmp/docker-artifacts
 
       - name: Download m2-1-listener binary
@@ -1183,14 +1183,14 @@ jobs:
           mkdir -p /tmp/docker-context/usr/local/bin
 
           tar_dir="$(mktemp -d)"
-          tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-x86_64.tar.gz -C "${tar_dir}"
-          mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
+          tar xzf /tmp/docker-artifacts/m1-1-app-api-rs-linux-x86_64.tar.gz -C "${tar_dir}"
+          mv "${tar_dir}/m1-1-app-api-rs" /tmp/docker-context/usr/local/bin/
           rm -rf "${tar_dir}"
 
           for f in /tmp/docker-artifacts/*.gz; do
             base="$(basename "$f" .gz)"
             case "$base" in
-              m1-1-platform-rs-linux-x86_64.tar) continue ;;
+              m1-1-app-api-rs-linux-x86_64.tar) continue ;;
             esac
             clean_name="${base%-linux-*}"
             gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
@@ -1231,7 +1231,7 @@ jobs:
     if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-aarch64-musl-docker"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
-      - build-m1-1-platform-rs-linux-arm64-musl
+      - build-m1-1-app-api-rs-linux-arm64-musl
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-archive-query-linux-arm64-musl
     runs-on: ubuntu-latest
@@ -1263,10 +1263,10 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Download m1-1-platform-rs binary and frontend assets
+      - name: Download m1-1-app-api-rs binary and frontend assets
         uses: actions/download-artifact@v4
         with:
-          name: binary-m1-1-platform-rs-arm64-musl
+          name: binary-m1-1-app-api-rs-arm64-musl
           path: /tmp/docker-artifacts
 
       - name: Download m2-1-listener binary
@@ -1295,14 +1295,14 @@ jobs:
           mkdir -p /tmp/docker-context/usr/local/bin
 
           tar_dir="$(mktemp -d)"
-          tar xzf /tmp/docker-artifacts/m1-1-platform-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
-          mv "${tar_dir}/m1-1-platform-rs" /tmp/docker-context/usr/local/bin/
+          tar xzf /tmp/docker-artifacts/m1-1-app-api-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
+          mv "${tar_dir}/m1-1-app-api-rs" /tmp/docker-context/usr/local/bin/
           rm -rf "${tar_dir}"
 
           for f in /tmp/docker-artifacts/*.gz; do
             base="$(basename "$f" .gz)"
             case "$base" in
-              m1-1-platform-rs-linux-arm64-musl.tar) continue ;;
+              m1-1-app-api-rs-linux-arm64-musl.tar) continue ;;
             esac
             clean_name="${base%-linux-*}"
             gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
@@ -1484,8 +1484,8 @@ jobs:
       - build-macos
       - build-android
       - prepare-shared-frontend-assets
-      - build-m1-1-platform-rs-linux-x86_64
-      - build-m1-1-platform-rs-linux-arm64-musl
+      - build-m1-1-app-api-rs-linux-x86_64
+      - build-m1-1-app-api-rs-linux-arm64-musl
       - build-m2-1-listener-linux-x86_64
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-archive-query-linux-x86_64
@@ -1539,11 +1539,11 @@ jobs:
               *.sha256|SHA256SUMS.txt)
                 return 0
                 ;;
-              m1-1-platform-rs-linux-x86_64.tar.gz)
-                dest="m1-1-platform-rs-linux-x86_64.tar.gz"
+              m1-1-app-api-rs-linux-x86_64.tar.gz)
+                dest="m1-1-app-api-rs-linux-x86_64.tar.gz"
                 ;;
-              m1-1-platform-rs-linux-arm64-musl.tar.gz)
-                dest="m1-1-platform-rs-linux-arm64-musl.tar.gz"
+              m1-1-app-api-rs-linux-arm64-musl.tar.gz)
+                dest="m1-1-app-api-rs-linux-arm64-musl.tar.gz"
                 ;;
               m2-1-listener-linux-x86_64.gz)
                 dest="m2-1-listener-linux-x86_64.gz"
