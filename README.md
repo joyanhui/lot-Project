@@ -6,6 +6,8 @@
 
 - `.github/workflows/release.yml`：手动 release workflow，按 `build_target` 构建并发布资产。
 - `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
+- `.github/workflows/ci-m0-1-center.yml`：M0-1 运行态中心 CI（Go）。
+- `.github/workflows/ci-m2-4-dev-reg.yml`：M2-4 设备注册服务 CI（Go）。
 - `.github/workflows/ci-m1-3-app.yml`：M1-3 Tauri App CI。
 - `.github/workflows/ci-m2-1-listener.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query.yml`：M2-2 归档查询层 CI。
@@ -32,13 +34,15 @@
 - `lot-manager-aio-x86_64-gnu-docker`：构建 x86_64 GNU Docker 目标。
 - `lot-manager-aio-aarch64-musl-docker`：构建 aarch64 musl Docker 目标。
 - `m1-1-app-api-rs`：构建 M1-1 控制面服务。
+- `m0-1-center`：构建 M0-1 运行态中心服务（Go）。
+- `m2-4-dev-reg`：构建 M2-4 设备注册服务（Go）。
 - `m2-1-listener`：构建 M2-1 接入层服务。
 - `m2-2-archive-query`：构建 M2-2 归档查询服务。
 - `m3-v1-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
 
 ## 主要产物
 
-- Rust 服务二进制：M1-1、M2-1、M2-2。
+- 服务二进制：M1-1、M0-1（Go）、M2-4（Go）、M2-1、M2-2。
 - M1-3 桌面/移动端资产：Linux、Windows、macOS、Android、iOS simulator 相关包。
 - Docker 镜像或镜像构建资产。
 - M3 ESP32-C3 固件资产。
