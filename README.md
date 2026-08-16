@@ -31,7 +31,7 @@
 ## 构建方式
 
 - x86_64 job：`bash script/dev.sh build:all`，Rust 服务端 native glibc 构建（CI 用 runner 系统 gcc，兼容 Debian），产出 `dist/linux_x86.tar.zst`。
-- arm64 job：`bash script/dev.sh build:all arm64`，Rust 服务端经 nixpkgs `pkgsCross.aarch64-multiplatform-musl` 交叉编译为静态 musl 二进制（静态 libstdc++ 取自 Alpine musl 包，链接后 patchelf 清理残留 NEEDED），产出 `dist/linux_arm64.tar.zst`。
+- arm64 job：`bash script/dev.sh build:all arm64`，Rust 服务端经 `cargo-zigbuild`（zig）交叉编译为静态 musl 二进制，产出 `dist/linux_arm64.tar.zst`。
 - iOS job（macos）：构建无签名 iOS Simulator `.app`，压缩为 `.app.ipa`（zip 格式，非真机可安装 IPA）。
 
 ## 发布资产
