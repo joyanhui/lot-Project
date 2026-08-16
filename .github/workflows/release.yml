@@ -184,7 +184,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -275,7 +275,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/m1-3-app-linux-x86_64.gz
@@ -358,7 +358,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/m1-3-app-windows-x64.msi
@@ -475,7 +475,7 @@ jobs:
             } | sort
           )
           ((${#files[@]} > 0))
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${files[@]}"
@@ -640,7 +640,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/android/*
@@ -716,7 +716,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -802,7 +802,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -875,7 +875,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -958,7 +958,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1031,7 +1031,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1114,7 +1114,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1195,7 +1195,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1276,7 +1276,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1357,7 +1357,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1438,7 +1438,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
@@ -1539,15 +1539,15 @@ jobs:
 
           chmod +x /tmp/docker-context/usr/local/bin/*
 
-          # 从项目根复制配置文件与入口脚本（不维护 script/ci/docker/ 下的独立副本）
+          # 从项目根复制配置文件与入口脚本（不维护 .github/script/docker/ 下的独立副本）
           cp workspace/config.lot.v2.json5 /tmp/docker-context/config.lot.v2.json5
-          cp workspace/script/ci/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
+          cp workspace/.github/script/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
 
           mkdir -p /tmp/release
           docker buildx build \
             --platform linux/amd64 \
             --output type=docker,dest=/tmp/release/lot-manager-aio-x86_64-gnu-docker.tar \
-            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio \
+            -f workspace/.github/script/docker/Dockerfile.lot-manager-aio \
             /tmp/docker-context
 
           gzip -c /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar > "/tmp/release/${OUTPUT_NAME}"
@@ -1561,7 +1561,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -1665,15 +1665,15 @@ jobs:
 
           chmod +x /tmp/docker-context/usr/local/bin/*
 
-          # 从项目根复制配置文件与入口脚本（不维护 script/ci/docker/ 下的独立副本）
+          # 从项目根复制配置文件与入口脚本（不维护 .github/script/docker/ 下的独立副本）
           cp workspace/config.lot.v2.json5 /tmp/docker-context/config.lot.v2.json5
-          cp workspace/script/ci/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
+          cp workspace/.github/script/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
 
           mkdir -p /tmp/release
           docker buildx build \
             --platform linux/arm64 \
             --output type=docker,dest=/tmp/release/lot-manager-aio-aarch64-musl-docker.tar \
-            -f workspace/script/ci/docker/Dockerfile.lot-manager-aio \
+            -f workspace/.github/script/docker/Dockerfile.lot-manager-aio \
             /tmp/docker-context
 
           gzip -c /tmp/release/lot-manager-aio-aarch64-musl-docker.tar > "/tmp/release/${OUTPUT_NAME}"
@@ -1687,7 +1687,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -1823,7 +1823,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/*
@@ -1882,7 +1882,7 @@ jobs:
           raw_dir="$(mktemp -d)"
           final_dir="$(mktemp -d)"
 
-          bash workspace/script/ci/gh-release.sh download \
+          bash workspace/.github/script/gh-release.sh download \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${raw_dir}"
@@ -2021,12 +2021,12 @@ jobs:
           )
 
           while IFS= read -r asset_id; do
-            bash workspace/script/ci/gh-release.sh delete-asset \
+            bash workspace/.github/script/gh-release.sh delete-asset \
               "${PRIVATE_RELEASE_REPO}" \
               "${asset_id}"
           done < <(gh api "repos/${PRIVATE_RELEASE_REPO}/releases/tags/${release_tag}" --jq '.assets[].id')
 
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             "${final_dir}"/*
@@ -2102,7 +2102,7 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
@@ -2168,11 +2168,11 @@ jobs:
         run: |
           set -euo pipefail
           release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${OUTPUT_NAME}.zst
-          bash workspace/script/ci/gh-release.sh upload \
+          bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${OUTPUT_NAME}.sha256
