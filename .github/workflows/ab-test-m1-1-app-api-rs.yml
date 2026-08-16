@@ -175,15 +175,19 @@ jobs:
             trap "kill ${M1_PID} 2>/dev/null || true" EXIT
             sleep 5
             cd ab-test/m1-1-app-api-rs/online-20k
+            bash monitor.sh /tmp/loadtest/monitor-m1.csv "${DUR}" m1-1-app-api-rs > /tmp/loadtest/monitor-m1.log 2>&1 &
+            MON_PID=$!
             if [ "${TEST_MODE}" = "mixed" ]; then
               ./loader -mode sse -conns "${CONNS}" -dur "${DUR}s" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" > /tmp/loadtest/sse.log 2>&1 &
               SSE_PID=$!
               sleep 3
               ./loader -mode req -workers "${WORKERS}" -dur "${DUR}s" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" -base http://127.0.0.1:19311 2>&1 | tee /tmp/loadtest/ab-test.log
               kill ${SSE_PID} 2>/dev/null || true
+              kill ${MON_PID} 2>/dev/null || true
               tail -3 /tmp/loadtest/sse.log >> /tmp/loadtest/ab-test.log
             else
               ./loader -mode "${TEST_MODE}" -workers "${WORKERS}" -conns "${CONNS}" -dur "${DUR}s" -rate "${RATE}" -owner-count "${OWNER_COUNT}" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" -base http://127.0.0.1:19311 2>&1 | tee /tmp/loadtest/ab-test.log
+              kill ${MON_PID} 2>/dev/null || true
             fi
           '
 
@@ -193,5 +197,6 @@ jobs:
           name: ab-test-m1-1-${{ inputs.test_mode }}-${{ github.run_id }}
           path: |
             /tmp/loadtest/ab-test.log
+            /tmp/loadtest/monitor-m1.csv
             /tmp/loadtest/m1.log
           if-no-files-found: warn
