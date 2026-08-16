@@ -164,14 +164,14 @@ jobs:
             echo "--- m2-1 log ---"; tail -8 /tmp/loadtest/m21.log || true
 
             echo "== warmup ${WARMUP_DUR}s =="
-            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${WARMUP_DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
+            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${WARMUP_DUR}s" -devices /tmp/loadtest/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
             sleep 20
             echo "--- warmup tail ---"; tail -3 /tmp/loadtest/warmup.log || true
 
             echo "== steady test ${DUR}s =="
             bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor.csv "${DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-go > /tmp/loadtest/monitor.log 2>&1 &
             MON_PID=$!
-            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log || true
+            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${DUR}s" -devices /tmp/loadtest/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log || true
             kill ${MON_PID} 2>/dev/null || true
             echo "--- m2-1 log tail ---"; tail -8 /tmp/loadtest/m21.log || true
             echo "--- m2-2 log tail ---"; tail -5 /tmp/loadtest/m22.log || true
