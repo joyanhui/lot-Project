@@ -14,9 +14,11 @@ on:
           - lot-manager-aio-aarch64-musl-docker
           - m1-1-app-api-rs
           - m1-2-ops-console
+          - m0-1-center
+          - m2-4-dev-reg
           - m2-1-listener
           - m2-2-archive-query
-           - m3-v1-esp32c3-classicsimple-firmware
+          - m3-v1-esp32c3-classicsimple-firmware
       publish_release:
         description: 是否发布到 release
         default: 'true'
@@ -1117,12 +1119,338 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
+  build-m0-1-center-linux-x86_64:
+    name: Build m0-1-center Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m0-1-center"]'), inputs.build_target) }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GOOS: linux
+      GOARCH: amd64
+      OUTPUT_NAME: m0-1-center-linux-x86_64
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m0-1-center x86_64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m0-1-center x86_64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Go for m0-1-center x86_64
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: |
+            workspace/go.work.sum
+            workspace/lot-go-shared/go.sum
+            workspace/m0-1-center/go.sum
+
+      - name: Build m0-1-center x86_64 binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+            -o "/tmp/release/${OUTPUT_NAME}" \
+            ./m0-1-center/cmd/m0-1-center
+
+      - name: Collect m0-1-center x86_64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "/tmp/release/${OUTPUT_NAME}"
+          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m0-1-center-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
+      - name: Upload m0-1-center x86_64 artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
+  build-m0-1-center-linux-arm64:
+    name: Build m0-1-center Linux arm64 .gz
+    if: ${{ contains(fromJSON('["all","m0-1-center"]'), inputs.build_target) }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GOOS: linux
+      GOARCH: arm64
+      OUTPUT_NAME: m0-1-center-linux-arm64
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m0-1-center arm64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m0-1-center arm64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Go for m0-1-center arm64
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: |
+            workspace/go.work.sum
+            workspace/lot-go-shared/go.sum
+            workspace/m0-1-center/go.sum
+
+      - name: Build m0-1-center arm64 binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+            -o "/tmp/release/${OUTPUT_NAME}" \
+            ./m0-1-center/cmd/m0-1-center
+
+      - name: Collect m0-1-center arm64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "/tmp/release/${OUTPUT_NAME}"
+          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m0-1-center-arm64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
+      - name: Upload m0-1-center arm64 artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
+  build-m2-4-dev-reg-linux-x86_64:
+    name: Build m2-4-dev-reg Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m2-4-dev-reg"]'), inputs.build_target) }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GOOS: linux
+      GOARCH: amd64
+      OUTPUT_NAME: m2-4-dev-reg-linux-x86_64
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg x86_64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m2-4-dev-reg x86_64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Go for m2-4-dev-reg x86_64
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: |
+            workspace/go.work.sum
+            workspace/lot-go-shared/go.sum
+            workspace/m2-4-dev-reg/go.sum
+
+      - name: Build m2-4-dev-reg x86_64 binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+            -o "/tmp/release/${OUTPUT_NAME}" \
+            ./m2-4-dev-reg/cmd/m2-4-dev-reg
+
+      - name: Collect m2-4-dev-reg x86_64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "/tmp/release/${OUTPUT_NAME}"
+          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-4-dev-reg-x86_64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
+      - name: Upload m2-4-dev-reg x86_64 artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
+  build-m2-4-dev-reg-linux-arm64:
+    name: Build m2-4-dev-reg Linux arm64 .gz
+    if: ${{ contains(fromJSON('["all","m2-4-dev-reg"]'), inputs.build_target) }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GOOS: linux
+      GOARCH: arm64
+      OUTPUT_NAME: m2-4-dev-reg-linux-arm64
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg arm64
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m2-4-dev-reg arm64 workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Go for m2-4-dev-reg arm64
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: |
+            workspace/go.work.sum
+            workspace/lot-go-shared/go.sum
+            workspace/m2-4-dev-reg/go.sum
+
+      - name: Build m2-4-dev-reg arm64 binary
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+            -o "/tmp/release/${OUTPUT_NAME}" \
+            ./m2-4-dev-reg/cmd/m2-4-dev-reg
+
+      - name: Collect m2-4-dev-reg arm64 .gz artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "/tmp/release/${OUTPUT_NAME}"
+          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
+
+      - name: Upload artifact for Docker combined image
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-m2-4-dev-reg-arm64
+          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
+          if-no-files-found: error
+
+      - name: Upload m2-4-dev-reg arm64 artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}.gz
+
   build-lot-manager-aio-x86_64-gnu-docker:
     name: Build lot-manager-aio x86_64 (alpine) combined Docker image
     if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-x86_64-gnu-docker"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
       - build-m1-1-app-api-rs-linux-x86_64
+      - build-m0-1-center-linux-x86_64
+      - build-m2-4-dev-reg-linux-x86_64
       - build-m2-1-listener-linux-x86_64
       - build-m2-2-archive-query-linux-x86_64
     runs-on: ubuntu-latest
@@ -1170,6 +1498,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: binary-m2-2-archive-query-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m0-1-center binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m0-1-center-x86_64
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-4-dev-reg binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-4-dev-reg-x86_64
           path: /tmp/docker-artifacts
 
 
@@ -1232,6 +1572,8 @@ jobs:
     needs:
       - prepare-private-release
       - build-m1-1-app-api-rs-linux-arm64-musl
+      - build-m0-1-center-linux-arm64
+      - build-m2-4-dev-reg-linux-arm64
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-archive-query-linux-arm64-musl
     runs-on: ubuntu-latest
@@ -1279,6 +1621,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: binary-m2-2-archive-query-arm64-musl
+          path: /tmp/docker-artifacts
+
+      - name: Download m0-1-center binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m0-1-center-arm64
+          path: /tmp/docker-artifacts
+
+      - name: Download m2-4-dev-reg binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-m2-4-dev-reg-arm64
           path: /tmp/docker-artifacts
 
 
@@ -1486,6 +1840,10 @@ jobs:
       - prepare-shared-frontend-assets
       - build-m1-1-app-api-rs-linux-x86_64
       - build-m1-1-app-api-rs-linux-arm64-musl
+      - build-m0-1-center-linux-x86_64
+      - build-m0-1-center-linux-arm64
+      - build-m2-4-dev-reg-linux-x86_64
+      - build-m2-4-dev-reg-linux-arm64
       - build-m2-1-listener-linux-x86_64
       - build-m2-1-listener-linux-arm64-musl
       - build-m2-2-archive-query-linux-x86_64
@@ -1545,6 +1903,18 @@ jobs:
               m1-1-app-api-rs-linux-arm64-musl.tar.gz)
                 dest="m1-1-app-api-rs-linux-arm64-musl.tar.gz"
                 ;;
+              m0-1-center-linux-x86_64.gz)
+                dest="m0-1-center-linux-x86_64.gz"
+                ;;
+              m0-1-center-linux-arm64.gz)
+                dest="m0-1-center-linux-arm64.gz"
+                ;;
+              m2-4-dev-reg-linux-x86_64.gz)
+                dest="m2-4-dev-reg-linux-x86_64.gz"
+                ;;
+              m2-4-dev-reg-linux-arm64.gz)
+                dest="m2-4-dev-reg-linux-arm64.gz"
+                ;;
               m2-1-listener-linux-x86_64.gz)
                 dest="m2-1-listener-linux-x86_64.gz"
                 ;;
@@ -1556,6 +1926,12 @@ jobs:
                 ;;
               m2-2-archive-query-linux-arm64-musl.gz)
                 dest="m2-2-archive-query-linux-arm64-musl.gz"
+                ;;
+              m1-2-ops-console-linux-x86_64.tar.gz)
+                dest="m1-2-ops-console-linux-x86_64.tar.gz"
+                ;;
+              m1-2-ops-console-linux-x86_64-single.zst)
+                dest="m1-2-ops-console-linux-x86_64-single.zst"
                 ;;
               m1-3-app-linux-x86_64.gz)
                 dest="m1-3-app-linux-x86_64.gz"
