@@ -126,6 +126,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/loadtest
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -c "INSERT INTO device_types (id, type_code, type_name, description, default_config_json, capabilities_json, created_at) VALUES (1, 'loadtest', 'Loadtest Device', '', '{}', '{}', now()) ON CONFLICT (id) DO NOTHING;"
           python3 ab-test/m2-1-m2-2-devices-20k/prep_devices.py
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_devices.sql
 
