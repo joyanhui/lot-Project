@@ -1,8 +1,7 @@
-name: CI M2-4 Dev Reg Go
+name: CI M1-2 Device API Rs
 
-# m2-4-dev-reg-go 设备注册服务：初始化窗口与预设读库、SSID 指纹校验、设备创建与
-# root_key 签发、bitmap 递增；与 m0-1-center-go 握手（注册/心跳/状态/配置拉取）。
-
+# m1-2-device-api-rs 设备面模块：设备注册、回源（pullConfig/checkUpdate/节点分配）、
+# 报警上报、固件下载代理、设备离线判断、通知派发（webhook/企业微信/电话）、告警事件推送 m1-1。
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m2-4-dev-reg-go-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m1-2-device-api-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -43,32 +42,31 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.26.5"
-          cache-dependency-path: |
-            workspace/go.work.sum
-            workspace/lot-shared-lib/golang/go.sum
-            workspace/m2-4-dev-reg-go/go.sum
+          shared-key: lot-rust-host
+          workspaces: |
+            workspace -> target
 
-      - name: Vet m2-4-dev-reg-go
+      - name: Validate workspace metadata
+        working-directory: workspace
+        shell: bash
+        run: cargo metadata --format-version 1 --no-deps
+
+      - name: Check m1-2-device-api-rs
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          go vet ./m2-4-dev-reg-go/... ./lot-shared-lib/golang/...
+          env -u CARGO_INCREMENTAL cargo check -p m1-2-device-api-rs
 
-      - name: Build m2-4-dev-reg-go
+      - name: Run m1-2-device-api-rs tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          go build ./m2-4-dev-reg-go/... ./lot-shared-lib/golang/...
-
-      - name: Run m2-4-dev-reg-go tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          go test ./m2-4-dev-reg-go/... ./lot-shared-lib/golang/...
+          env -u CARGO_INCREMENTAL cargo test -p m1-2-device-api-rs
