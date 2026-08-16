@@ -56,7 +56,10 @@ jobs:
       - name: Typecheck m1-2-ops-console-ts
         working-directory: workspace/m1-2-ops-console-ts
         shell: bash
-        run: bun run typecheck
+        run: |
+          set -euo pipefail
+          bunx react-router typegen
+          bun run typecheck
 
       - name: Lint m1-2-ops-console-ts
         working-directory: workspace/m1-2-ops-console-ts
