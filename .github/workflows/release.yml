@@ -1730,3 +1730,73 @@ jobs:
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
+
+  build-m1-2-ops-console-single-linux-x86_64:
+    name: Build m1-2-ops-console single binary Linux x86_64 (.zst)
+    if: ${{ contains(fromJSON('["all","m1-2-ops-console"]'), inputs.build_target) }}
+    needs:
+      - prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      OUTPUT_NAME: m1-2-ops-console-linux-x86_64-single
+    steps:
+      - name: Checkout lot-Project repo
+        uses: actions/checkout@v4
+        with:
+          path: public
+
+      - name: Checkout lot-manager-aio workspace for m1-2-ops-console single binary
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch m1-2-ops-console workspace to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Build m1-2-ops-console single binary
+        shell: bash
+        run: bash workspace/script/dev_bash/build-m12-single.sh bun-linux-x64
+
+      - name: Collect m1-2-ops-console single binary artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/release
+          cp workspace/m1-2-ops-console/dist/${OUTPUT_NAME}* /tmp/release/
+
+      - name: Upload m1-2-ops-console single binary artifacts to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          release_tag="${{ env.RELEASE_TAG }}"
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${OUTPUT_NAME}.zst
+          bash workspace/script/ci/gh-release.sh upload \
+            "${release_tag}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${OUTPUT_NAME}.sha256
