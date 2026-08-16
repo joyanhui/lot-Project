@@ -9,8 +9,8 @@ on:
         required: false
         type: string
       warmup_dur:
-        description: 预热时长（秒，触发 root key 拉取）
-        default: "90"
+        description: 预热时长（秒，触发 root key 拉取；冷环境建议 ≥120）
+        default: "120"
         required: false
         type: string
       dur:
@@ -165,7 +165,7 @@ jobs:
 
             echo "== warmup ${WARMUP_DUR}s =="
             ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${WARMUP_DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
-            sleep 10
+            sleep 20
             echo "--- warmup tail ---"; tail -3 /tmp/loadtest/warmup.log || true
 
             echo "== steady test ${DUR}s =="
