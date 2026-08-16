@@ -145,6 +145,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p /tmp/loadtest
           python3 ab-test/m1-1-app-api-rs/online-20k/prep.py
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_users.sql
 
