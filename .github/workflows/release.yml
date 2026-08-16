@@ -96,7 +96,12 @@ jobs:
           nix develop --command bash -c '
             set -euo pipefail
             rustup default stable
+            rustup target add x86_64-unknown-linux-musl
             rustup toolchain install nightly-2026-05-08 --profile minimal --component rust-src
+            export CC_x86_64_unknown_linux_musl="$(
+              nix build --no-link --print-out-paths \
+                "nixpkgs#pkgsCross.musl64.buildPackages.gcc"
+            )/bin/x86_64-unknown-linux-musl-gcc"
             bun install --frozen-lockfile
             bash script/dev.sh build:all
           '
@@ -167,6 +172,7 @@ jobs:
             rustup default stable
             rustup target add aarch64-unknown-linux-musl aarch64-linux-android
             rustup toolchain install nightly-2026-05-08 --profile minimal --component rust-src
+            cargo install tauri-cli --version "^2" --locked || true
             export CC_aarch64_unknown_linux_musl="$(
               nix build --no-link --print-out-paths \
                 "nixpkgs#pkgsCross.aarch64-multiplatform-musl.buildPackages.gcc"
