@@ -83,6 +83,12 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v30
 
+      - name: Cache ESP-IDF toolchain
+        uses: actions/cache@v4
+        with:
+          path: workspace/.embuild
+          key: embuild-${{ matrix.arch }}-${{ hashFiles('workspace/Cargo.lock') }}
+
       - name: Build via dev.sh build:all
         working-directory: workspace
         shell: bash
@@ -136,6 +142,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rustup default stable
           curl -fsSL https://bun.sh/install | bash
           export PATH="$HOME/.bun/bin:$PATH"
           bun install --frozen-lockfile
