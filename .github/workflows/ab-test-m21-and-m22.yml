@@ -90,12 +90,23 @@ jobs:
             bash script/dev.sh build:m2-2-archive-query-rs x86_64
           "
 
-      - name: Run database migration
+      - name: Initialize database schema
         working-directory: workspace
         shell: bash
-        env:
-          Common_Database_Url: postgres://postgres:postgres@127.0.0.1:5432/m1_1_platform
-        run: nix develop --command bash -c "cargo run -p lot-manager-migration -- up"
+        run: |
+          set -euo pipefail
+          for f in migration/migrations/V*.sql; do
+            if ! PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f "$f" >/tmp/mig.out 2>&1; then
+              if grep -q "already exists" /tmp/mig.out; then
+                echo "ignored idempotent conflict: $(basename "$f")"
+              else
+                echo "::error::migration failed: $(basename "$f")"
+                tail -10 /tmp/mig.out
+                exit 1
+              fi
+            fi
+          done
+          echo "schema initialized"
 
       - name: Prepare test users
         working-directory: workspace
