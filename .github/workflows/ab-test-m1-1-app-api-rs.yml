@@ -1,0 +1,182 @@
+name: ab-test-m1-1-app-api-rs
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 压测模式（req 混合请求 / sse 长连接 / push 事件推送 / mixed 混合）
+        required: true
+        default: req
+        type: choice
+        options:
+          - req
+          - sse
+          - push
+          - mixed
+      workers:
+        description: req 模式并发 worker 数
+        default: "4"
+        required: false
+        type: string
+      conns:
+        description: sse 模式连接数
+        default: "2000"
+        required: false
+        type: string
+      dur:
+        description: 测试时长（秒）
+        default: "60"
+        required: true
+        type: string
+      rate:
+        description: push 模式事件率（个/秒）
+        default: "10"
+        required: false
+        type: string
+      owner_count:
+        description: push 模式 owner 轮询范围
+        default: "2000"
+        required: false
+        type: string
+      token_mode:
+        description: token 选择（random 随机 / round-robin 顺序，验证 per-user 缓存用 round-robin）
+        default: round-robin
+        required: false
+        type: choice
+        options:
+          - round-robin
+          - random
+      token_limit:
+        description: 使用前 N 个 token（0 = 全部；配合 round-robin 提高缓存命中率）
+        default: "2000"
+        required: false
+        type: string
+      source_ref:
+        description: 源码 ref（如 main）
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PRIVATE_RELEASE_REPO: joyanhui/lot-manager-aio
+  SOURCE_REF: ${{ inputs.source_ref }}
+
+concurrency:
+  group: ab-test-m1-1-app-api-rs
+  cancel-in-progress: false
+
+jobs:
+  ab-test:
+    name: ab-test m1-1 (${{ inputs.test_mode }})
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: m1_1_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Checkout lot-manager-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Build m1-1 via dev.sh
+        working-directory: workspace
+        shell: bash
+        run: nix develop --command bash script/dev.sh build:m1-1-app-api-rs x86_64
+
+      - name: Build loader
+        working-directory: workspace/ab-test/m1-1-app-api-rs/online-20k
+        shell: bash
+        run: nix develop --command bash -c "GOWORK=off go build -buildvcs=false -o loader ."
+
+      - name: Run database migration
+        working-directory: workspace
+        shell: bash
+        env:
+          Common_Database_Url: postgres://postgres:postgres@127.0.0.1:5432/m1_1_platform
+        run: nix develop --command bash -c "cargo run -p lot-manager-migration -- up"
+
+      - name: Prepare test users and tokens
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ab-test/m1-1-app-api-rs/online-20k/prep.py
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_users.sql
+
+      - name: Start m1-1 and run ab test
+        working-directory: workspace
+        shell: bash
+        env:
+          M1_1_Db_Max_Connections: "25"
+          TEST_MODE: ${{ inputs.test_mode }}
+          WORKERS: ${{ inputs.workers }}
+          CONNS: ${{ inputs.conns }}
+          DUR: ${{ inputs.dur }}
+          RATE: ${{ inputs.rate }}
+          OWNER_COUNT: ${{ inputs.owner_count }}
+          TOKEN_MODE: ${{ inputs.token_mode }}
+          TOKEN_LIMIT: ${{ inputs.token_limit }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/loadtest
+          nix develop --command bash -c '
+            set -euo pipefail
+            ./target/release/m1-1-app-api-rs > /tmp/loadtest/m1.log 2>&1 &
+            M1_PID=$!
+            trap "kill ${M1_PID} 2>/dev/null || true" EXIT
+            sleep 5
+            cd ab-test/m1-1-app-api-rs/online-20k
+            if [ "${TEST_MODE}" = "mixed" ]; then
+              ./loader -mode sse -conns "${CONNS}" -dur "${DUR}s" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" > /tmp/loadtest/sse.log 2>&1 &
+              SSE_PID=$!
+              sleep 3
+              ./loader -mode req -workers "${WORKERS}" -dur "${DUR}s" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" -base http://127.0.0.1:19311 2>&1 | tee /tmp/loadtest/ab-test.log
+              kill ${SSE_PID} 2>/dev/null || true
+              tail -3 /tmp/loadtest/sse.log >> /tmp/loadtest/ab-test.log
+            else
+              ./loader -mode "${TEST_MODE}" -workers "${WORKERS}" -conns "${CONNS}" -dur "${DUR}s" -rate "${RATE}" -owner-count "${OWNER_COUNT}" -token-mode "${TOKEN_MODE}" -token-limit "${TOKEN_LIMIT}" -base http://127.0.0.1:19311 2>&1 | tee /tmp/loadtest/ab-test.log
+            fi
+          '
+
+      - name: Upload ab-test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ab-test-m1-1-${{ inputs.test_mode }}-${{ github.run_id }}
+          path: |
+            /tmp/loadtest/ab-test.log
+            /tmp/loadtest/m1.log
+          if-no-files-found: warn
