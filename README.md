@@ -40,7 +40,7 @@
 - `linux_arm64.tar.zst` + `linux_arm64.tar.zst.sha256`
 - `m4-1-userApp-tauri-ios-simulator.app.ipa`
 
-压缩包内布局：5 个服务二进制、`m1-2-ops-console-ts-<tag>-single`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。不再发布 Docker 镜像与各模块独立压缩包。
+压缩包内布局：5 个服务二进制、`m1-9-ops-panel-ts-<tag>-single`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。不再发布 Docker 镜像与各模块独立压缩包。
 
 ## 与主仓库的关系
 
