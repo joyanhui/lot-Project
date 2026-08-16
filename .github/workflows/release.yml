@@ -3,22 +3,6 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      build_target:
-        description: 构建目标
-        default: all
-        type: choice
-        options:
-          - all
-          - lot-manager-aio-docker
-          - lot-manager-aio-x86_64-gnu-docker
-          - lot-manager-aio-aarch64-musl-docker
-          - m1-1-app-api-rs
-          - m1-2-ops-console-ts
-          - m0-1-center-go
-          - m2-4-dev-reg-go
-          - m2-1-listener-rs
-          - m2-2-archive-query-rs
-          - m3-rs-esp32c3-classicsimple-firmware
       publish_release:
         description: 是否发布到 release
         default: 'true'
@@ -27,13 +11,13 @@ on:
           - 'true'
           - 'false'
       release_tag:
-        description: 发布 tag（如 v0.1.0）       
+        description: 发布 tag（如 v0.1.0）
         default: 'v0.1.0'
         required: true
         type: string
       source_ref:
         description: 源码 ref（如 v0.1.0 或 main）
-        required: true      
+        required: true
         default: 'main'
         type: string
 
@@ -46,7 +30,6 @@ concurrency:
 
 env:
   PRIVATE_RELEASE_REPO: joyanhui/lot-manager-aio
-  BUILD_TARGET: ${{ inputs.build_target }}
   PUBLISH_RELEASE: ${{ inputs.publish_release }}
   RELEASE_TAG: ${{ inputs.release_tag }}
   SOURCE_REF: ${{ inputs.source_ref }}
@@ -69,15 +52,15 @@ jobs:
           fi
           gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
 
-  prepare-shared-frontend-assets:
-    name: Build shared frontend assets for m1-1-app-api-rs and m4-1-userApp-tauri
-    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs","m4-1-userApp-tauri","m4-1-userApp-tauri-android","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
+  build-x86_64:
+    name: Build linux_x86.tar.zst via dev.sh build:all
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      OUTPUT_NAME: linux_x86.tar.zst
     steps:
-      - name: Checkout lot-manager-aio workspace for shared frontend assets
+      - name: Checkout lot-manager-aio workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -86,7 +69,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch shared frontend workspace to requested source ref
+      - name: Switch workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -96,41 +79,57 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun for shared frontend assets
-        uses: oven-sh/setup-bun@v2
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
 
-      - name: Install workspace dependencies for shared frontend assets
+      - name: Cache ESP-IDF toolchain
+        uses: actions/cache@v4
+        with:
+          path: workspace/.embuild
+          key: embuild-${{ hashFiles('workspace/Cargo.lock') }}
+
+      - name: Build all targets and package archive
         working-directory: workspace
         shell: bash
-        run: bun install
+        run: |
+          set -euo pipefail
+          nix develop --command bash -c '
+            set -euo pipefail
+            rustup default stable
+            rustup toolchain install nightly-2026-05-08 --profile minimal --component rust-src
+            bun install --frozen-lockfile
+            bash script/dev.sh build:all
+          '
 
-      - name: Build shared frontend tauri assets for m4-1-userApp-tauri
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build
-
-      - name: Upload shared frontend tauri assets for m4-1-userApp-tauri
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-tauri-dist
-          path: workspace/frontend/dist
+          name: linux-x86-archive
+          path: dist/linux_x86.tar.zst*
           if-no-files-found: error
 
-  build-frontend-web:
-    name: Build frontend web dist for independent deployment
-    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          bash .github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" \
+            "${PRIVATE_RELEASE_REPO}" \
+            dist/linux_x86.tar.zst \
+            dist/linux_x86.tar.zst.sha256
+
+  build-arm64:
+    name: Build linux_arm64.tar.zst via dev.sh build:all arm64
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: frontend-web-dist.tar.gz
+      OUTPUT_NAME: linux_arm64.tar.zst
     steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for frontend web assets
+      - name: Checkout lot-manager-aio workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -139,7 +138,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch frontend workspace to requested source ref
+      - name: Switch workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -149,236 +148,62 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun for frontend web assets
-        uses: oven-sh/setup-bun@v2
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
 
-      - name: Install workspace dependencies for frontend web assets
+      - name: Cache ESP-IDF toolchain
+        uses: actions/cache@v4
+        with:
+          path: workspace/.embuild
+          key: embuild-${{ hashFiles('workspace/Cargo.lock') }}
+
+      - name: Build all targets and package archive
         working-directory: workspace
-        shell: bash
-        run: bun install
-
-      - name: Build frontend web dist
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build
-
-      - name: Collect frontend web dist artifacts
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/release
-          tar czf "/tmp/release/${OUTPUT_NAME}" -C workspace/frontend/dist .
+          nix develop --command bash -c '
+            set -euo pipefail
+            rustup default stable
+            rustup target add aarch64-unknown-linux-musl aarch64-linux-android
+            rustup toolchain install nightly-2026-05-08 --profile minimal --component rust-src
+            export CC_aarch64_unknown_linux_musl="$(
+              nix build --no-link --print-out-paths \
+                "nixpkgs#pkgsCross.aarch64-multiplatform-musl.buildPackages.gcc"
+            )/bin/aarch64-unknown-linux-musl-gcc"
+            bun install --frozen-lockfile
+            bash script/dev.sh build:all arm64
+          '
 
-      - name: Upload frontend web dist artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-web-dist
-          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          name: linux-arm64-archive
+          path: dist/linux_arm64.tar.zst*
           if-no-files-found: error
 
-      - name: Upload frontend web dist artifacts to private release
+      - name: Upload to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
+          bash .github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" \
             "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}
+            dist/linux_arm64.tar.zst \
+            dist/linux_arm64.tar.zst.sha256
 
-  build-linux:
-    name: Build m4-1-userApp-tauri Linux x86_64 binary
-    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Linux
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m4-1-userApp-tauri Linux workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Install Linux system dependencies for m4-1-userApp-tauri
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Setup Rust for m4-1-userApp-tauri Linux
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Linux
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-tauri-dist
-          path: workspace/frontend/dist
-
-      - name: Build m4-1-userApp-tauri Linux x86_64 binary
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        env:
-          LOT_SKIP_FRONTEND_BUILD: "true"
-        run: |
-          set -euo pipefail
-          cargo install tauri-cli --version "^2" --locked || true
-          cargo tauri build --no-bundle
-
-      - name: Collect m4-1-userApp-tauri Linux x86_64 binary
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/release/lot-manager-m4-1-userapp-tauri"
-          output_name="m4-1-userApp-tauri-linux-x86_64"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${output_name}.gz"
-
-      - name: Upload m4-1-userApp-tauri Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m4-1-userApp-tauri-linux
-          path: |
-            /tmp/release/m4-1-userApp-tauri-linux-x86_64.gz
-          if-no-files-found: warn
-
-      - name: Upload m4-1-userApp-tauri Linux artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/m4-1-userApp-tauri-linux-x86_64.gz
-
-  build-windows:
-    name: Build m4-1-userApp-tauri Windows (.msi)
-    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
-    runs-on: windows-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Windows
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m4-1-userApp-tauri Windows workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m4-1-userApp-tauri Windows
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Windows
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-tauri-dist
-          path: workspace/frontend/dist
-
-      - name: Build m4-1-userApp-tauri Windows .msi
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        env:
-          LOT_SKIP_FRONTEND_BUILD: "true"
-        run: |
-          set -euo pipefail
-          cargo install tauri-cli --version "^2" --locked || true
-          cargo tauri build --bundles msi
-
-      - name: Collect m4-1-userApp-tauri Windows .msi artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          msi_path="$(find workspace/target/release/bundle -type f -name '*.msi' | head -1)"
-          test -n "${msi_path}"
-          cp "${msi_path}" /tmp/release/m4-1-userApp-tauri-windows-x64.msi
-
-      - name: Upload m4-1-userApp-tauri Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m4-1-userApp-tauri-windows
-          path: |
-            /tmp/release/m4-1-userApp-tauri-windows-x64.msi
-          if-no-files-found: warn
-
-      - name: Upload m4-1-userApp-tauri Windows artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/m4-1-userApp-tauri-windows-x64.msi
-
-  build-macos:
-    name: Build m4-1-userApp-tauri macOS .dmg + iOS simulator .app.ipa
-    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
+  build-ios:
+    name: Build iOS simulator .app.ipa
+    needs: prepare-private-release
     runs-on: macos-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      OUTPUT_NAME: m4-1-userApp-tauri-ios-simulator.app.ipa
     steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri macOS/iOS
+      - name: Checkout lot-manager-aio workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -387,7 +212,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m4-1-userApp-tauri macOS/iOS workspace to requested source ref
+      - name: Switch workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -397,1782 +222,66 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m4-1-userApp-tauri macOS/iOS
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Add Apple targets for m4-1-userApp-tauri macOS/iOS
+      - name: Add Apple targets
         shell: bash
-        run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+        run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-      - name: Download shared frontend tauri assets for m4-1-userApp-tauri macOS/iOS
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-tauri-dist
-          path: workspace/frontend/dist
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
 
-      - name: Build m4-1-userApp-tauri macOS .dmg
+      - name: Build shared frontend assets
+        working-directory: workspace/frontend
+        shell: bash
+        run: LOT_SKIP_CHECKER=1 bun run build
+
+      - name: Install tauri CLI
+        shell: bash
+        run: cargo install tauri-cli --version "^2" --locked || true
+
+      - name: Initialize iOS project
         working-directory: workspace/m4-1-userApp-tauri
         shell: bash
-        env:
-          LOT_SKIP_FRONTEND_BUILD: "true"
-        run: |
-          set -euo pipefail
-          cargo install tauri-cli --version "^2" --locked || true
-          cargo tauri build --bundles dmg
+        run: cargo tauri ios init --ci --skip-targets-install
 
-      - name: Initialize m4-1-userApp-tauri iOS project
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo install tauri-cli --version "^2" --locked || true
-          cargo tauri ios init --ci --skip-targets-install
-
-      - name: Build m4-1-userApp-tauri iOS simulator app
+      - name: Build iOS simulator app
         working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri ios build --target aarch64-sim --ci
 
-      - name: Package m4-1-userApp-tauri iOS simulator .app.ipa artifact
+      - name: Package .app to .app.ipa
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          dmg_path="$(find workspace/target/release/bundle -type f -name '*.dmg' | head -1)"
-          test -n "${dmg_path}"
-          cp "${dmg_path}" /tmp/release/m4-1-userApp-tauri-macos.dmg
           app_path="$(find workspace/m4-1-userApp-tauri/gen/apple/build -type d -name '*.app' | head -1)"
           test -n "${app_path}"
-          cp -R "${app_path}" /tmp/release/
-          ditto -c -k --keepParent "${app_path}" "/tmp/release/m4-1-userApp-tauri-ios-simulator.app.ipa"
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/${OUTPUT_NAME}"
 
-      - name: Upload m4-1-userApp-tauri macOS/iOS artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: m4-1-userApp-tauri-apple
-          path: |
-            /tmp/release/m4-1-userApp-tauri-macos.dmg
-            /tmp/release/m4-1-userApp-tauri-ios-simulator.app.ipa
+          name: m4-1-userApp-tauri-ios
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
           if-no-files-found: warn
 
-      - name: Upload m4-1-userApp-tauri macOS/iOS artifacts to private release
+      - name: Upload to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.TOKEN_GH }}
         run: |
           set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          files=()
-          while IFS= read -r file; do
-            files+=("${file}")
-          done < <(
-            {
-              find /tmp/release -maxdepth 1 -type f -name 'm4-1-userApp-tauri-macos.dmg' 2>/dev/null
-              find /tmp/release -maxdepth 1 -type f -name 'm4-1-userApp-tauri-ios-simulator.app.ipa' 2>/dev/null
-            } | sort
-          )
-          ((${#files[@]} > 0))
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            "${files[@]}"
-
-  build-android:
-    name: Build m4-1-userApp-tauri Android (.apk)
-    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-android"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - prepare-shared-frontend-assets
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Android
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m4-1-userApp-tauri Android workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m4-1-userApp-tauri Android
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Java for m4-1-userApp-tauri Android
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Setup Android SDK for m4-1-userApp-tauri
-        uses: android-actions/setup-android@v3
-
-      - name: Add Android Rust targets for m4-1-userApp-tauri
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
-          cargo install tauri-cli --version "^2" --locked || true
-
-      - name: Install Android NDK for m4-1-userApp-tauri
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkmanager --install "ndk;27.0.12077973" --channel=0
-          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
-
-      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Android
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-tauri-dist
-          path: workspace/frontend/dist
-
-      - name: Initialize m4-1-userApp-tauri Android project
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        run: cargo tauri android init --ci --skip-targets-install
-
-      - name: Build m4-1-userApp-tauri Android universal APK and AAB
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        env:
-          LOT_SKIP_FRONTEND_BUILD: "true"
-        run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --aab
-
-      - name: Build m4-1-userApp-tauri Android split APKs
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        env:
-          LOT_SKIP_FRONTEND_BUILD: "true"
-        run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --split-per-abi
-
-      - name: Sign m4-1-userApp-tauri Android APK
-        working-directory: workspace/m4-1-userApp-tauri
-        shell: bash
-        run: |
-          set -euo pipefail
-          props_file="signing/android/release-signing.properties"
-          test -f "${props_file}"
-          keystore_rel="$(grep '^storeFile=' "${props_file}" | cut -d= -f2-)"
-          store_password="$(grep '^storePassword=' "${props_file}" | cut -d= -f2-)"
-          key_alias="$(grep '^keyAlias=' "${props_file}" | cut -d= -f2-)"
-          key_password="$(grep '^keyPassword=' "${props_file}" | cut -d= -f2-)"
-          keystore_path="${keystore_rel}"
-          if [[ ! -f "${keystore_path}" ]]; then
-            keystore_path="$(basename "${keystore_rel}")"
-            keystore_path="signing/android/${keystore_path}"
-          fi
-          test -f "${keystore_path}"
-          build_tools_dir="$(find "${ANDROID_HOME}/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)"
-          test -n "${build_tools_dir}"
-          mkdir -p /tmp/release/android
-
-          while IFS= read -r unsigned_apk; do
-            signed_apk="${unsigned_apk/-unsigned.apk/.apk}"
-            "${build_tools_dir}/apksigner" sign \
-              --ks "${keystore_path}" \
-              --ks-key-alias "${key_alias}" \
-              --ks-pass "pass:${store_password}" \
-              --key-pass "pass:${key_password}" \
-              --out "${signed_apk}" \
-              "${unsigned_apk}"
-            "${build_tools_dir}/apksigner" verify "${signed_apk}"
-
-            case "$(basename "${signed_apk}")" in
-              *universal*.apk)
-                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-universal.apk
-                ;;
-              *arm64-v8a*.apk|*aarch64*.apk|*arm64*.apk)
-                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-arm64-v8a.apk
-                ;;
-              *armeabi-v7a*.apk|*armv7*.apk|*arm-release*.apk)
-                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-armeabi-v7a.apk
-                ;;
-              *x86_64*.apk)
-                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-x86_64.apk
-                ;;
-            esac
-          done < <(find gen/android -type f -name '*-unsigned.apk' | sort)
-
-          unsigned_aab="$(find gen/android -type f -name '*.aab' | head -1)"
-          test -n "${unsigned_aab}"
-          signed_aab="/tmp/release/android/m4-1-userApp-tauri-android.aab"
-          jarsigner \
-            -keystore "${keystore_path}" \
-            -storepass "${store_password}" \
-            -keypass "${key_password}" \
-            -signedjar "${signed_aab}" \
-            "${unsigned_aab}" \
-            "${key_alias}"
-
-      - name: Upload m4-1-userApp-tauri Android artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: m4-1-userApp-tauri-android
-          path: |
-            /tmp/release/android/*
-          if-no-files-found: warn
-
-      - name: Upload m4-1-userApp-tauri Android artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/android/*
-
-  build-m1-1-app-api-rs-linux-x86_64:
-    name: Build m1-1-app-api-rs Linux x86_64 .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m1-1-app-api-rs-linux-x86_64.tar.gz
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m1-1-app-api-rs x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m1-1-app-api-rs x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m1-1-app-api-rs x86_64
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build m1-1-app-api-rs x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release -p m1-1-app-api-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m1-1-app-api-rs x86_64 .tar.gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          tar_dir="$(mktemp -d)"
-          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-app-api-rs" "${tar_dir}/"
-          cd "${tar_dir}"
-          tar czf "/tmp/release/${OUTPUT_NAME}" .
-          cd /
-          rm -rf "${tar_dir}"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m1-1-app-api-rs-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}
-          if-no-files-found: error
-
-      - name: Upload m1-1-app-api-rs x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
+          bash .github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" \
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-m1-1-app-api-rs-linux-arm64-musl:
-    name: Build m1-1-app-api-rs Linux arm64 musl .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m1-1-app-api-rs-linux-arm64-musl.tar.gz
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m1-1-app-api-rs arm64 musl
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m1-1-app-api-rs arm64 musl workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m1-1-app-api-rs arm64 musl
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-musl
-
-      - name: Install cargo-zigbuild for musl
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-zigbuild
-
-      - name: Setup Zig for musl cross-compilation
-        uses: mlugg/setup-zig@v2
-
-      - name: Build m1-1-app-api-rs arm64 musl binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo zigbuild --release -p m1-1-app-api-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m1-1-app-api-rs arm64 musl .tar.gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          tar_dir="$(mktemp -d)"
-          cp "workspace/target/${TARGET_TRIPLE}/release/m1-1-app-api-rs" "${tar_dir}/"
-          cd "${tar_dir}"
-          tar czf "/tmp/release/${OUTPUT_NAME}" .
-          cd /
-          rm -rf "${tar_dir}"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m1-1-app-api-rs-arm64-musl
-          path: /tmp/release/${{ env.OUTPUT_NAME }}
-          if-no-files-found: error
-
-      - name: Upload m1-1-app-api-rs arm64 musl artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-m2-1-listener-rs-linux-x86_64:
-    name: Build m2-1-listener-rs Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-1-listener-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-1-listener-rs-linux-x86_64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-1-listener-rs x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-1-listener-rs x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m2-1-listener-rs x86_64
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build m2-1-listener-rs x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release -p m2-1-listener-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m2-1-listener-rs x86_64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener-rs"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-1-listener-rs-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-1-listener-rs x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m2-1-listener-rs-linux-arm64-musl:
-    name: Build m2-1-listener-rs Linux arm64 musl .gz
-    if: ${{ contains(fromJSON('["all","m2-1-listener-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m2-1-listener-rs-linux-arm64-musl
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-1-listener-rs arm64 musl
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-1-listener-rs arm64 musl workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m2-1-listener-rs arm64 musl
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-musl
-
-      - name: Install cargo-zigbuild for musl
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-zigbuild
-
-      - name: Setup Zig for musl cross-compilation
-        uses: mlugg/setup-zig@v2
-
-      - name: Build m2-1-listener-rs arm64 musl binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo zigbuild --release -p m2-1-listener-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m2-1-listener-rs arm64 musl .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener-rs"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-1-listener-rs-arm64-musl
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-1-listener-rs arm64 musl artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m2-2-archive-query-rs-linux-x86_64:
-    name: Build m2-2-archive-query-rs Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-2-archive-query-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-2-archive-query-rs-linux-x86_64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-2-archive-query-rs x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-2-archive-query-rs x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m2-2-archive-query-rs x86_64
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build m2-2-archive-query-rs x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo build --release -p m2-2-archive-query-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m2-2-archive-query-rs x86_64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query-rs"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-2-archive-query-rs-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-2-archive-query-rs x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m2-2-archive-query-rs-linux-arm64-musl:
-    name: Build m2-2-archive-query-rs Linux arm64 musl .gz
-    if: ${{ contains(fromJSON('["all","m2-2-archive-query-rs"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m2-2-archive-query-rs-linux-arm64-musl
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-2-archive-query-rs arm64 musl
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-2-archive-query-rs arm64 musl workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust for m2-2-archive-query-rs arm64 musl
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-musl
-
-      - name: Install cargo-zigbuild for musl
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-zigbuild
-
-      - name: Setup Zig for musl cross-compilation
-        uses: mlugg/setup-zig@v2
-
-      - name: Build m2-2-archive-query-rs arm64 musl binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo zigbuild --release -p m2-2-archive-query-rs --target "${TARGET_TRIPLE}"
-
-      - name: Collect m2-2-archive-query-rs arm64 musl .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query-rs"
-          test -f "${binary_path}"
-          gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-2-archive-query-rs-arm64-musl
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-2-archive-query-rs arm64 musl artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m0-1-center-go-linux-x86_64:
-    name: Build m0-1-center-go Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m0-1-center-go"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      GOOS: linux
-      GOARCH: amd64
-      OUTPUT_NAME: m0-1-center-go-linux-x86_64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m0-1-center-go x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m0-1-center-go x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Go for m0-1-center-go x86_64
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
-          cache-dependency-path: |
-            workspace/go.work.sum
-            workspace/lot-shared-lib/golang/go.sum
-            workspace/m0-1-center-go/go.sum
-
-      - name: Build m0-1-center-go x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
-            -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m0-1-center-go/cmd/m0-1-center
-
-      - name: Collect m0-1-center-go x86_64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "/tmp/release/${OUTPUT_NAME}"
-          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m0-1-center-go-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m0-1-center-go x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m0-1-center-go-linux-arm64:
-    name: Build m0-1-center-go Linux arm64 .gz
-    if: ${{ contains(fromJSON('["all","m0-1-center-go"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      GOOS: linux
-      GOARCH: arm64
-      OUTPUT_NAME: m0-1-center-go-linux-arm64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m0-1-center-go arm64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m0-1-center-go arm64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Go for m0-1-center-go arm64
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
-          cache-dependency-path: |
-            workspace/go.work.sum
-            workspace/lot-shared-lib/golang/go.sum
-            workspace/m0-1-center-go/go.sum
-
-      - name: Build m0-1-center-go arm64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
-            -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m0-1-center-go/cmd/m0-1-center
-
-      - name: Collect m0-1-center-go arm64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "/tmp/release/${OUTPUT_NAME}"
-          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m0-1-center-go-arm64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m0-1-center-go arm64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m2-4-dev-reg-go-linux-x86_64:
-    name: Build m2-4-dev-reg-go Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-4-dev-reg-go"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      GOOS: linux
-      GOARCH: amd64
-      OUTPUT_NAME: m2-4-dev-reg-go-linux-x86_64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg-go x86_64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-4-dev-reg-go x86_64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Go for m2-4-dev-reg-go x86_64
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
-          cache-dependency-path: |
-            workspace/go.work.sum
-            workspace/lot-shared-lib/golang/go.sum
-            workspace/m2-4-dev-reg-go/go.sum
-
-      - name: Build m2-4-dev-reg-go x86_64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
-            -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m2-4-dev-reg-go/cmd/m2-4-dev-reg
-
-      - name: Collect m2-4-dev-reg-go x86_64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "/tmp/release/${OUTPUT_NAME}"
-          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-4-dev-reg-go-x86_64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-4-dev-reg-go x86_64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-m2-4-dev-reg-go-linux-arm64:
-    name: Build m2-4-dev-reg-go Linux arm64 .gz
-    if: ${{ contains(fromJSON('["all","m2-4-dev-reg-go"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      GOOS: linux
-      GOARCH: arm64
-      OUTPUT_NAME: m2-4-dev-reg-go-linux-arm64
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg-go arm64
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m2-4-dev-reg-go arm64 workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Go for m2-4-dev-reg-go arm64
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
-          cache-dependency-path: |
-            workspace/go.work.sum
-            workspace/lot-shared-lib/golang/go.sum
-            workspace/m2-4-dev-reg-go/go.sum
-
-      - name: Build m2-4-dev-reg-go arm64 binary
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
-            -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m2-4-dev-reg-go/cmd/m2-4-dev-reg
-
-      - name: Collect m2-4-dev-reg-go arm64 .gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f "/tmp/release/${OUTPUT_NAME}"
-          gzip -c "/tmp/release/${OUTPUT_NAME}" > "/tmp/release/${OUTPUT_NAME}.gz"
-
-      - name: Upload artifact for Docker combined image
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-m2-4-dev-reg-go-arm64
-          path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
-          if-no-files-found: error
-
-      - name: Upload m2-4-dev-reg-go arm64 artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}.gz
-
-  build-lot-manager-aio-x86_64-gnu-docker:
-    name: Build lot-manager-aio x86_64 (alpine) combined Docker image
-    if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-x86_64-gnu-docker"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - build-m1-1-app-api-rs-linux-x86_64
-      - build-m0-1-center-go-linux-x86_64
-      - build-m2-4-dev-reg-go-linux-x86_64
-      - build-m2-1-listener-rs-linux-x86_64
-      - build-m2-2-archive-query-rs-linux-x86_64
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: lot-manager-aio-x86_64-gnu-docker.tar.gz
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for Docker context
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Download m1-1-app-api-rs binary and frontend assets
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m1-1-app-api-rs-x86_64
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-1-listener-rs binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-1-listener-rs-x86_64
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-2-archive-query-rs binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-2-archive-query-rs-x86_64
-          path: /tmp/docker-artifacts
-
-      - name: Download m0-1-center-go binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m0-1-center-go-x86_64
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-4-dev-reg-go binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-4-dev-reg-go-x86_64
-          path: /tmp/docker-artifacts
-
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Prepare Docker build context and build image
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/docker-context/usr/local/bin
-
-          tar_dir="$(mktemp -d)"
-          tar xzf /tmp/docker-artifacts/m1-1-app-api-rs-linux-x86_64.tar.gz -C "${tar_dir}"
-          mv "${tar_dir}/m1-1-app-api-rs" /tmp/docker-context/usr/local/bin/
-          rm -rf "${tar_dir}"
-
-          for f in /tmp/docker-artifacts/*.gz; do
-            base="$(basename "$f" .gz)"
-            case "$base" in
-              m1-1-app-api-rs-linux-x86_64.tar) continue ;;
-            esac
-            clean_name="${base%-linux-*}"
-            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
-            chmod +x "/tmp/docker-context/usr/local/bin/${clean_name}"
-          done
-
-          chmod +x /tmp/docker-context/usr/local/bin/*
-
-          # 从项目根复制配置文件与入口脚本（不维护 .github/script/docker/ 下的独立副本）
-          cp workspace/config.lot.v2.json5 /tmp/docker-context/config.lot.v2.json5
-          cp workspace/.github/script/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
-
-          mkdir -p /tmp/release
-          docker buildx build \
-            --platform linux/amd64 \
-            --output type=docker,dest=/tmp/release/lot-manager-aio-x86_64-gnu-docker.tar \
-            -f workspace/.github/script/docker/Dockerfile.lot-manager-aio \
-            /tmp/docker-context
-
-          gzip -c /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar > "/tmp/release/${OUTPUT_NAME}"
-          rm -f /tmp/release/lot-manager-aio-x86_64-gnu-docker.tar
-
-      - name: Upload Docker image artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-lot-manager-aio-aarch64-musl-docker:
-    name: Build lot-manager-aio aarch64 (alpine) combined Docker image
-    if: ${{ contains(fromJSON('["all","lot-manager-aio-docker","lot-manager-aio-aarch64-musl-docker"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-      - build-m1-1-app-api-rs-linux-arm64-musl
-      - build-m0-1-center-go-linux-arm64
-      - build-m2-4-dev-reg-go-linux-arm64
-      - build-m2-1-listener-rs-linux-arm64-musl
-      - build-m2-2-archive-query-rs-linux-arm64-musl
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: lot-manager-aio-aarch64-musl-docker.tar.gz
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for Docker context
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Download m1-1-app-api-rs binary and frontend assets
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m1-1-app-api-rs-arm64-musl
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-1-listener-rs binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-1-listener-rs-arm64-musl
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-2-archive-query-rs binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-2-archive-query-rs-arm64-musl
-          path: /tmp/docker-artifacts
-
-      - name: Download m0-1-center-go binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m0-1-center-go-arm64
-          path: /tmp/docker-artifacts
-
-      - name: Download m2-4-dev-reg-go binary
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-m2-4-dev-reg-go-arm64
-          path: /tmp/docker-artifacts
-
-
-      - name: Set up QEMU for arm64 emulation
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Prepare Docker build context and build image
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/docker-context/usr/local/bin
-
-          tar_dir="$(mktemp -d)"
-          tar xzf /tmp/docker-artifacts/m1-1-app-api-rs-linux-arm64-musl.tar.gz -C "${tar_dir}"
-          mv "${tar_dir}/m1-1-app-api-rs" /tmp/docker-context/usr/local/bin/
-          rm -rf "${tar_dir}"
-
-          for f in /tmp/docker-artifacts/*.gz; do
-            base="$(basename "$f" .gz)"
-            case "$base" in
-              m1-1-app-api-rs-linux-arm64-musl.tar) continue ;;
-            esac
-            clean_name="${base%-linux-*}"
-            gunzip -c "$f" > "/tmp/docker-context/usr/local/bin/${clean_name}"
-            chmod +x "/tmp/docker-context/usr/local/bin/${clean_name}"
-          done
-
-          chmod +x /tmp/docker-context/usr/local/bin/*
-
-          # 从项目根复制配置文件与入口脚本（不维护 .github/script/docker/ 下的独立副本）
-          cp workspace/config.lot.v2.json5 /tmp/docker-context/config.lot.v2.json5
-          cp workspace/.github/script/docker/entrypoint.sh /tmp/docker-context/entrypoint.sh
-
-          mkdir -p /tmp/release
-          docker buildx build \
-            --platform linux/arm64 \
-            --output type=docker,dest=/tmp/release/lot-manager-aio-aarch64-musl-docker.tar \
-            -f workspace/.github/script/docker/Dockerfile.lot-manager-aio \
-            /tmp/docker-context
-
-          gzip -c /tmp/release/lot-manager-aio-aarch64-musl-docker.tar > "/tmp/release/${OUTPUT_NAME}"
-          rm -f /tmp/release/lot-manager-aio-aarch64-musl-docker.tar
-
-      - name: Upload Docker image artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-esp32c3-classicsimple-firmware:
-    name: Build m3-rs esp32c3-classicsimple firmware
-    if: ${{ contains(fromJSON('["all","m3-rs-esp32c3-classicsimple-firmware"]'), inputs.build_target) }}
-    needs: prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: M3-v1-esp32c3-classicsimple-firmware.elf
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m3-rs esp32c3-classicsimple
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m3-rs esp32c3-classicsimple workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Rust nightly for m3-rs esp32c3-classicsimple
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-08
-          components: rust-src
-
-      - name: Install ldproxy for m3-rs esp32c3-classicsimple
-        shell: bash
-        run: cargo install ldproxy --locked
-
-      - name: Install ESP-IDF system dependencies for m3-rs esp32c3-classicsimple
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            wget \
-            flex \
-            bison \
-            gperf \
-            python3 \
-            python3-pip \
-            python3-venv \
-            cmake \
-            ninja-build \
-            ccache \
-            libffi-dev \
-            libssl-dev \
-            dfu-util \
-            libusb-1.0-0
-
-      - name: Prepare m3-rs esp32c3-classicsimple firmware config
-        working-directory: workspace/m3-rs
-        shell: bash
-        run: |
-          set -euo pipefail
-          source ../script/dev_bash/export-esp.sh
-          bash ../script/dev_bash/prepare-m3-sdkconfig.sh
-          cp sdkconfig.defaults sdkconfig
-
-      - name: Build m3-rs esp32c3-classicsimple firmware ELF
-        working-directory: workspace/m3-rs
-        shell: bash
-        run: |
-          set -euo pipefail
-          source ../script/dev_bash/export-esp.sh
-          cp sdkconfig.defaults sdkconfig
-          env \
-            -u RUSTFLAGS \
-            -u CARGO_ENCODED_RUSTFLAGS \
-            -u CARGO_PROFILE_DEV_SPLIT_DEBUGINFO \
-            -u CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO \
-            ESP_IDF_SDKCONFIG="$PWD/sdkconfig" \
-            ESP_IDF_SDKCONFIG_DEFAULTS="$PWD/sdkconfig.defaults" \
-            ESP_IDF_TOOLS_INSTALL_DIR="custom:$PWD/.embuild/espressif" \
-            cargo build \
-              --release \
-              --package lot-manager-m3-firmware \
-              --bin lot-manager-m3-firmware-esp32c3 \
-              --features esp32c3 \
-              --target riscv32imc-esp-espidf
-
-      - name: Collect m3-rs esp32c3-classicsimple firmware artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          firmware_path="workspace/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
-          if [[ ! -f "${firmware_path}" ]]; then
-            firmware_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
-          fi
-          test -f "${firmware_path}"
-          partition_table_path="workspace/target/riscv32imc-esp-espidf/release/partition-table.bin"
-          if [[ ! -f "${partition_table_path}" ]]; then
-            partition_table_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/partition-table.bin"
-          fi
-          test -f "${partition_table_path}"
-          bootloader_path="workspace/target/riscv32imc-esp-espidf/release/bootloader.bin"
-          if [[ ! -f "${bootloader_path}" ]]; then
-            bootloader_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/bootloader.bin"
-          fi
-          test -f "${bootloader_path}"
-          cp "${firmware_path}" "/tmp/release/${OUTPUT_NAME}"
-          cp "${partition_table_path}" /tmp/release/M3-v1-esp32c3-classicsimple-partition-table.bin
-          cp "${bootloader_path}" /tmp/release/M3-v1-esp32c3-classicsimple-bootloader.bin
-          cp workspace/m3-rs/config.toml /tmp/release/M3-v1-esp32c3-classicsimple-config.toml.example
-          cp workspace/m3-rs/sdkconfig.defaults /tmp/release/M3-v1-esp32c3-classicsimple-sdkconfig.defaults
-          cp workspace/m3-rs/partitions.csv /tmp/release/M3-v1-esp32c3-classicsimple-partitions.csv
-
-      - name: Upload m3-rs esp32c3-classicsimple firmware artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/*
-
-  finalize-private-release-assets:
-    name: Finalize private release assets
-    runs-on: ubuntu-latest
-    needs:
-      - prepare-private-release
-      - build-linux
-      - build-windows
-      - build-macos
-      - build-android
-      - prepare-shared-frontend-assets
-      - build-m1-1-app-api-rs-linux-x86_64
-      - build-m1-1-app-api-rs-linux-arm64-musl
-      - build-m0-1-center-go-linux-x86_64
-      - build-m0-1-center-go-linux-arm64
-      - build-m2-4-dev-reg-go-linux-x86_64
-      - build-m2-4-dev-reg-go-linux-arm64
-      - build-m2-1-listener-rs-linux-x86_64
-      - build-m2-1-listener-rs-linux-arm64-musl
-      - build-m2-2-archive-query-rs-linux-x86_64
-      - build-m2-2-archive-query-rs-linux-arm64-musl
-      - build-esp32c3-classicsimple-firmware
-      - build-lot-manager-aio-x86_64-gnu-docker
-      - build-lot-manager-aio-aarch64-musl-docker
-    if: ${{ always() && inputs.publish_release == 'true' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
-    steps:
-      - name: Checkout lot-manager-aio workspace for private release finalization
-        uses: actions/checkout@v4
-        with:
-          repository: joyanhui/lot-manager-aio
-          path: workspace
-          fetch-depth: 0
-          token: ${{ secrets.TOKEN_GH }}
-
-      - name: Switch private release finalization workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_ref="${{ env.SOURCE_REF }}"
-          if [[ -n "${source_ref}" ]]; then
-            git fetch --all --tags --prune
-            git checkout "${source_ref}"
-          fi
-
-      - name: Normalize and republish private release assets
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          raw_dir="$(mktemp -d)"
-          final_dir="$(mktemp -d)"
-
-          bash workspace/.github/script/gh-release.sh download \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            "${raw_dir}"
-
-          normalize_asset() {
-            local src="$1"
-            local base dest
-            base="$(basename "$src")"
-            dest=""
-
-            case "$base" in
-              *.sha256|SHA256SUMS.txt)
-                return 0
-                ;;
-              m1-1-app-api-rs-linux-x86_64.tar.gz)
-                dest="m1-1-app-api-rs-linux-x86_64.tar.gz"
-                ;;
-              m1-1-app-api-rs-linux-arm64-musl.tar.gz)
-                dest="m1-1-app-api-rs-linux-arm64-musl.tar.gz"
-                ;;
-              m0-1-center-go-linux-x86_64.gz)
-                dest="m0-1-center-go-linux-x86_64.gz"
-                ;;
-              m0-1-center-go-linux-arm64.gz)
-                dest="m0-1-center-go-linux-arm64.gz"
-                ;;
-              m2-4-dev-reg-go-linux-x86_64.gz)
-                dest="m2-4-dev-reg-go-linux-x86_64.gz"
-                ;;
-              m2-4-dev-reg-go-linux-arm64.gz)
-                dest="m2-4-dev-reg-go-linux-arm64.gz"
-                ;;
-              m2-1-listener-rs-linux-x86_64.gz)
-                dest="m2-1-listener-rs-linux-x86_64.gz"
-                ;;
-              m2-1-listener-rs-linux-arm64-musl.gz)
-                dest="m2-1-listener-rs-linux-arm64-musl.gz"
-                ;;
-              m2-2-archive-query-rs-linux-x86_64.gz)
-                dest="m2-2-archive-query-rs-linux-x86_64.gz"
-                ;;
-              m2-2-archive-query-rs-linux-arm64-musl.gz)
-                dest="m2-2-archive-query-rs-linux-arm64-musl.gz"
-                ;;
-              m1-2-ops-console-ts-linux-x86_64.tar.gz)
-                dest="m1-2-ops-console-ts-linux-x86_64.tar.gz"
-                ;;
-              m1-2-ops-console-ts-linux-x86_64-single.zst)
-                dest="m1-2-ops-console-ts-linux-x86_64-single.zst"
-                ;;
-              m4-1-userApp-tauri-linux-x86_64.gz)
-                dest="m4-1-userApp-tauri-linux-x86_64.gz"
-                ;;
-              M3-v1-esp32c3-classicsimple-firmware.elf)
-                dest="M3-v1-esp32c3-classicsimple-firmware.elf"
-                ;;
-              M3-v1-esp32c3-classicsimple-bootloader.bin)
-                dest="M3-v1-esp32c3-classicsimple-bootloader.bin"
-                ;;
-              M3-v1-esp32c3-classicsimple-partition-table.bin)
-                dest="M3-v1-esp32c3-classicsimple-partition-table.bin"
-                ;;
-              M3-v1-esp32c3-classicsimple-config.toml.example)
-                dest="M3-v1-esp32c3-classicsimple-config.toml.example"
-                ;;
-              M3-v1-esp32c3-classicsimple-sdkconfig.defaults)
-                dest="M3-v1-esp32c3-classicsimple-sdkconfig.defaults"
-                ;;
-              M3-v1-esp32c3-classicsimple-partitions.csv)
-                dest="M3-v1-esp32c3-classicsimple-partitions.csv"
-                ;;
-              m3-rs-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf)
-                dest="M3-v1-esp32c3-classicsimple-firmware.elf"
-                ;;
-              partition-table.bin)
-                dest="M3-v1-esp32c3-classicsimple-partition-table.bin"
-                ;;
-              bootloader.bin)
-                dest="M3-v1-esp32c3-classicsimple-bootloader.bin"
-                ;;
-              config.toml.example)
-                dest="M3-v1-esp32c3-classicsimple-config.toml.example"
-                ;;
-              sdkconfig.defaults)
-                dest="M3-v1-esp32c3-classicsimple-sdkconfig.defaults"
-                ;;
-              partitions.csv)
-                dest="M3-v1-esp32c3-classicsimple-partitions.csv"
-                ;;
-              *.msi)
-                dest="m4-1-userApp-tauri-windows-x64.msi"
-                ;;
-              *.dmg)
-                dest="m4-1-userApp-tauri-macos.dmg"
-                ;;
-              *-ios-simulator.app.ipa)
-                dest="m4-1-userApp-tauri-ios-simulator.app.ipa"
-                ;;
-              *.aab)
-                dest="m4-1-userApp-tauri-android.aab"
-                ;;
-              *universal*.apk)
-                dest="m4-1-userApp-tauri-android-universal.apk"
-                ;;
-              *arm64-v8a*.apk|*aarch64*.apk)
-                dest="m4-1-userApp-tauri-android-arm64-v8a.apk"
-                ;;
-              *armeabi-v7a*.apk|*armv7*.apk)
-                dest="m4-1-userApp-tauri-android-armeabi-v7a.apk"
-                ;;
-              *x86_64*.apk)
-                dest="m4-1-userApp-tauri-android-x86_64.apk"
-                ;;
-              lot-manager-aio-x86_64-gnu-docker.tar.gz)
-                dest="lot-manager-aio-x86_64-gnu-docker.tar.gz"
-                ;;
-              lot-manager-aio-aarch64-musl-docker.tar.gz)
-                dest="lot-manager-aio-aarch64-musl-docker.tar.gz"
-                ;;
-              *)
-                echo "未识别的资产文件名: ${base}" >&2
-                exit 1
-                ;;
-            esac
-
-            cp -f "$src" "${final_dir}/${dest}"
-          }
-
-          while IFS= read -r file; do
-            normalize_asset "${file}"
-          done < <(find "${raw_dir}" -maxdepth 1 -type f | sort)
-
-          (
-            cd "${final_dir}"
-            sha256sum * > SHA256SUMS.txt
-          )
-
-          while IFS= read -r asset_id; do
-            bash workspace/.github/script/gh-release.sh delete-asset \
-              "${PRIVATE_RELEASE_REPO}" \
-              "${asset_id}"
-          done < <(gh api "repos/${PRIVATE_RELEASE_REPO}/releases/tags/${release_tag}" --jq '.assets[].id')
-
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            "${final_dir}"/*
-
-  # publish-release: 已删除 — 发布资产统一走 finalize-private-release-assets 上传到 lot-manager-aio
-
-  build-m1-2-ops-console-ts-linux-x86_64:
-    name: Build m1-2-ops-console-ts Linux x86_64 .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-2-ops-console-ts"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: m1-2-ops-console-ts-linux-x86_64.tar.gz
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m1-2-ops-console-ts
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m1-2-ops-console-ts workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install workspace dependencies
-        working-directory: workspace
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Build m1-2-ops-console-ts SSR bundle
-        working-directory: workspace/m1-2-ops-console-ts
-        shell: bash
-        run: bun run build
-
-      - name: Collect m1-2-ops-console-ts .tar.gz artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          tar_dir="$(mktemp -d)"
-          cp -r workspace/m1-2-ops-console-ts/build "${tar_dir}/build"
-          cp -r workspace/m1-2-ops-console-ts/src/server "${tar_dir}/src/server"
-          cp -r workspace/m1-2-ops-console-ts/package.json "${tar_dir}/package.json"
-          cd "${tar_dir}"
-          tar czf "/tmp/release/${OUTPUT_NAME}" .
-          cd /
-          rm -rf "${tar_dir}"
-
-      - name: Upload m1-2-ops-console-ts artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${{ env.OUTPUT_NAME }}
-
-  build-m1-2-ops-console-ts-single-linux-x86_64:
-    name: Build m1-2-ops-console-ts single binary Linux x86_64 (.zst)
-    if: ${{ contains(fromJSON('["all","m1-2-ops-console-ts"]'), inputs.build_target) }}
-    needs:
-      - prepare-private-release
-    runs-on: ubuntu-latest
-    env:
-      TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: m1-2-ops-console-ts-linux-x86_64-single
-    steps:
-      - name: Checkout lot-Project repo
-        uses: actions/checkout@v4
-        with:
-          path: public
-
-      - name: Checkout lot-manager-aio workspace for m1-2-ops-console-ts single binary
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.PRIVATE_RELEASE_REPO }}
-          ref: main
-          token: ${{ secrets.TOKEN_GH }}
-          path: workspace
-          fetch-depth: 0
-
-      - name: Switch m1-2-ops-console-ts workspace to requested source ref
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
-            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
-          fi
-          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install workspace dependencies
-        working-directory: workspace
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Build m1-2-ops-console-ts single binary
-        shell: bash
-        run: bash workspace/script/dev_bash/build-m12-single.sh bun-linux-x64
-
-      - name: Collect m1-2-ops-console-ts single binary artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/release
-          cp workspace/m1-2-ops-console-ts/dist/${OUTPUT_NAME}* /tmp/release/
-
-      - name: Upload m1-2-ops-console-ts single binary artifacts to private release
-        if: ${{ env.PUBLISH_RELEASE == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.TOKEN_GH }}
-        run: |
-          set -euo pipefail
-          release_tag="${{ env.RELEASE_TAG }}"
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${OUTPUT_NAME}.zst
-          bash workspace/.github/script/gh-release.sh upload \
-            "${release_tag}" \
-            "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/${OUTPUT_NAME}.sha256
