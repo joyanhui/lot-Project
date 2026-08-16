@@ -1,4 +1,4 @@
-name: CI M3-V1
+name: CI M2-1 Listener
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m3-v1-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m2-1-listener-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -55,16 +55,16 @@ jobs:
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
 
-      - name: Check m3-v1
+      - name: Check m2-1-listener-rs
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-firmware
+          env -u CARGO_INCREMENTAL cargo check -p m2-1-listener-rs
 
-      - name: Run m3-v1 host tests
+      - name: Run m2-1-listener-rs tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware
+          env -u CARGO_INCREMENTAL cargo test -p m2-1-listener-rs

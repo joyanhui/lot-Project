@@ -1,7 +1,8 @@
-name: CI M2-4 Dev Reg
+name: CI M0-1 Center
 
-# m2-4-dev-reg 设备注册服务：初始化窗口与预设读库、SSID 指纹校验、设备创建与
-# root_key 签发、bitmap 递增；与 m0-1-center 握手（注册/心跳/状态/配置拉取）。
+# m0-1-center-go 运行态中心：调度（节点注册心跳、节点分配、bitmap/root key 同步）、
+# 配置中心（runtime_configs 快照与分发）、离线裁决、告警处理、通知派发、电话报警计费、
+# 设备面 RPC（pullConfig/checkUpdate/固件下载代理）。
 
 on:
   workflow_dispatch:
@@ -15,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m2-4-dev-reg-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m0-1-center-go-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -49,26 +50,26 @@ jobs:
           go-version: "1.26.5"
           cache-dependency-path: |
             workspace/go.work.sum
-            workspace/lot-go-shared/go.sum
-            workspace/m2-4-dev-reg/go.sum
+            workspace/lot-shared-lib/golang/go.sum
+            workspace/m0-1-center-go/go.sum
 
-      - name: Vet m2-4-dev-reg
+      - name: Vet m0-1-center-go
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          go vet ./m2-4-dev-reg/... ./lot-go-shared/...
+          go vet ./m0-1-center-go/... ./lot-shared-lib/golang/...
 
-      - name: Build m2-4-dev-reg
+      - name: Build m0-1-center-go
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          go build ./m2-4-dev-reg/... ./lot-go-shared/...
+          go build ./m0-1-center-go/... ./lot-shared-lib/golang/...
 
-      - name: Run m2-4-dev-reg tests
+      - name: Run m0-1-center-go tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          go test ./m2-4-dev-reg/... ./lot-go-shared/...
+          go test ./m0-1-center-go/... ./lot-shared-lib/golang/...

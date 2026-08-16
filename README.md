@@ -6,12 +6,12 @@
 
 - `.github/workflows/release.yml`：手动 release workflow，按 `build_target` 构建并发布资产。
 - `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
-- `.github/workflows/ci-m0-1-center.yml`：M0-1 运行态中心 CI（Go）。
-- `.github/workflows/ci-m2-4-dev-reg.yml`：M2-4 设备注册服务 CI（Go）。
-- `.github/workflows/ci-m1-3-app.yml`：M1-3 Tauri App CI。
-- `.github/workflows/ci-m2-1-listener.yml`：M2-1 接入层 CI。
-- `.github/workflows/ci-m2-2-archive-query.yml`：M2-2 归档查询层 CI。
-- `.github/workflows/ci-m3-v1.yml`：M3 固件 CI。
+- `.github/workflows/ci-m0-1-center-go.yml`：M0-1 运行态中心 CI（Go）。
+- `.github/workflows/ci-m2-4-dev-reg-go.yml`：M2-4 设备注册服务 CI（Go）。
+- `.github/workflows/ci-m4-1-userApp-tauri.yml`：M1-3 Tauri App CI。
+- `.github/workflows/ci-m2-1-listener-rs.yml`：M2-1 接入层 CI。
+- `.github/workflows/ci-m2-2-archive-query-rs.yml`：M2-2 归档查询层 CI。
+- `.github/workflows/ci-m3-rs.yml`：M3 固件 CI。
 - `.gitignore`：发布工程忽略规则。
 
 ## release workflow
@@ -34,11 +34,11 @@
 - `lot-manager-aio-x86_64-gnu-docker`：构建 x86_64 GNU Docker 目标。
 - `lot-manager-aio-aarch64-musl-docker`：构建 aarch64 musl Docker 目标。
 - `m1-1-app-api-rs`：构建 M1-1 控制面服务。
-- `m0-1-center`：构建 M0-1 运行态中心服务（Go）。
-- `m2-4-dev-reg`：构建 M2-4 设备注册服务（Go）。
-- `m2-1-listener`：构建 M2-1 接入层服务。
-- `m2-2-archive-query`：构建 M2-2 归档查询服务。
-- `m3-v1-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
+- `m0-1-center-go`：构建 M0-1 运行态中心服务（Go）。
+- `m2-4-dev-reg-go`：构建 M2-4 设备注册服务（Go）。
+- `m2-1-listener-rs`：构建 M2-1 接入层服务。
+- `m2-2-archive-query-rs`：构建 M2-2 归档查询服务。
+- `m3-rs-esp32c3-classicsimple-firmware`：构建 ESP32-C3 classicsimple 固件。
 
 ## 主要产物
 
@@ -77,9 +77,9 @@ tag 前缀决定 `build_target`：
 ├──────────────────────────────────────────┼────────────────────────┤
 │ v0.1.0                                   │ all（全部资产）        │
 │ m1-1-app-api-rs-v0.1.0                  │ m1-1-app-api-rs       │
-│ m1-3-app-v0.1.0                          │ M1-3 桌面/移动端       │
-│ m2-1-listener-v0.1.0                     │ m2-1-listener          │
+│ m4-1-userApp-tauri-v0.1.0                          │ M1-3 桌面/移动端       │
+│ m2-1-listener-rs-v0.1.0                     │ m2-1-listener-rs          │
 │ m2-2-...archive-v0.1.0                   │ M2-2 归档查询          │
-│ m3-v1-firmware-v0.1.0                    │ ESP32-C3 固件          │
+│ m3-rs-firmware-v0.1.0                    │ ESP32-C3 固件          │
 └──────────────────────────────────────────┴────────────────────────┘
 ```

@@ -1,4 +1,4 @@
-name: CI M1-2 Ops Console
+name: CI M1-3 App
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-2-ops-console-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m4-1-userApp-tauri-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -48,22 +48,29 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Typecheck shared layer
-        working-directory: workspace
-        shell: bash
-        run: bun run --filter @lot-manager/shared typecheck
-
-      - name: Typecheck m1-2-ops-console
-        working-directory: workspace/m1-2-ops-console
-        shell: bash
-        run: bun run typecheck
-
-      - name: Lint m1-2-ops-console
-        working-directory: workspace/m1-2-ops-console
-        shell: bash
-        run: bun run lint
-
-      - name: Build m1-2-ops-console
-        working-directory: workspace/m1-2-ops-console
+      - name: Build frontend assets
+        working-directory: workspace/frontend
         shell: bash
         run: bun run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies for Tauri check
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Validate workspace metadata
+        working-directory: workspace
+        shell: bash
+        run: cargo metadata --format-version 1 --no-deps
+
+      - name: Check Tauri shell crate
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m4-1-userapp-tauri

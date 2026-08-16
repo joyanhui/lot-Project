@@ -13,12 +13,12 @@ on:
           - lot-manager-aio-x86_64-gnu-docker
           - lot-manager-aio-aarch64-musl-docker
           - m1-1-app-api-rs
-          - m1-2-ops-console
-          - m0-1-center
-          - m2-4-dev-reg
-          - m2-1-listener
-          - m2-2-archive-query
-          - m3-v1-esp32c3-classicsimple-firmware
+          - m1-2-ops-console-ts
+          - m0-1-center-go
+          - m2-4-dev-reg-go
+          - m2-1-listener-rs
+          - m2-2-archive-query-rs
+          - m3-rs-esp32c3-classicsimple-firmware
       publish_release:
         description: 是否发布到 release
         default: 'true'
@@ -70,8 +70,8 @@ jobs:
           gh release create "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" --title "${release_tag}" --notes "" || gh release view "${release_tag}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
 
   prepare-shared-frontend-assets:
-    name: Build shared frontend assets for m1-1-platform and m1-3-app
-    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs","m1-3-app","m1-3-app-android","m1-3-app-desktop"]'), inputs.build_target) }}
+    name: Build shared frontend assets for m1-1-app-api-rs and m4-1-userApp-tauri
+    if: ${{ contains(fromJSON('["all","m1-1-app-api-rs","m4-1-userApp-tauri","m4-1-userApp-tauri-android","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -104,16 +104,16 @@ jobs:
         shell: bash
         run: bun install
 
-      - name: Build shared frontend tauri assets for m1-3-app
-        working-directory: workspace/frontend-old
+      - name: Build shared frontend tauri assets for m4-1-userApp-tauri
+        working-directory: workspace/frontend
         shell: bash
-        run: bun run build:tauri
+        run: bun run build
 
-      - name: Upload shared frontend tauri assets for m1-3-app
+      - name: Upload shared frontend tauri assets for m4-1-userApp-tauri
         uses: actions/upload-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend-old/dist-tauri
+          path: workspace/frontend/dist
           if-no-files-found: error
 
   build-frontend-web:
@@ -190,8 +190,8 @@ jobs:
             /tmp/release/${{ env.OUTPUT_NAME }}
 
   build-linux:
-    name: Build m1-3-app Linux x86_64 binary
-    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), inputs.build_target) }}
+    name: Build m4-1-userApp-tauri Linux x86_64 binary
+    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -204,7 +204,7 @@ jobs:
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-3-app Linux
+      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Linux
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -213,7 +213,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-3-app Linux workspace to requested source ref
+      - name: Switch m4-1-userApp-tauri Linux workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -223,24 +223,24 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Install Linux system dependencies for m1-3-app
+      - name: Install Linux system dependencies for m4-1-userApp-tauri
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Setup Rust for m1-3-app Linux
+      - name: Setup Rust for m4-1-userApp-tauri Linux
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Download shared frontend tauri assets for m1-3-app Linux
+      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Linux
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend-old/dist-tauri
+          path: workspace/frontend/dist
 
-      - name: Build m1-3-app Linux x86_64 binary
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri Linux x86_64 binary
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
@@ -249,25 +249,25 @@ jobs:
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri build --no-bundle
 
-      - name: Collect m1-3-app Linux x86_64 binary
+      - name: Collect m4-1-userApp-tauri Linux x86_64 binary
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/target/release/lot-manager-m1-3-app"
-          output_name="m1-3-app-linux-x86_64"
+          binary_path="workspace/target/release/lot-manager-m4-1-userapp-tauri"
+          output_name="m4-1-userApp-tauri-linux-x86_64"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${output_name}.gz"
 
-      - name: Upload m1-3-app Linux artifacts
+      - name: Upload m4-1-userApp-tauri Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: m1-3-app-linux
+          name: m4-1-userApp-tauri-linux
           path: |
-            /tmp/release/m1-3-app-linux-x86_64.gz
+            /tmp/release/m4-1-userApp-tauri-linux-x86_64.gz
           if-no-files-found: warn
 
-      - name: Upload m1-3-app Linux artifacts to private release
+      - name: Upload m4-1-userApp-tauri Linux artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -278,11 +278,11 @@ jobs:
           bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/m1-3-app-linux-x86_64.gz
+            /tmp/release/m4-1-userApp-tauri-linux-x86_64.gz
 
   build-windows:
-    name: Build m1-3-app Windows (.msi)
-    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), inputs.build_target) }}
+    name: Build m4-1-userApp-tauri Windows (.msi)
+    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -295,7 +295,7 @@ jobs:
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-3-app Windows
+      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Windows
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -304,7 +304,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-3-app Windows workspace to requested source ref
+      - name: Switch m4-1-userApp-tauri Windows workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -314,17 +314,17 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m1-3-app Windows
+      - name: Setup Rust for m4-1-userApp-tauri Windows
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Download shared frontend tauri assets for m1-3-app Windows
+      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Windows
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend-old/dist-tauri
+          path: workspace/frontend/dist
 
-      - name: Build m1-3-app Windows .msi
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri Windows .msi
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
@@ -333,24 +333,24 @@ jobs:
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri build --bundles msi
 
-      - name: Collect m1-3-app Windows .msi artifacts
+      - name: Collect m4-1-userApp-tauri Windows .msi artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           msi_path="$(find workspace/target/release/bundle -type f -name '*.msi' | head -1)"
           test -n "${msi_path}"
-          cp "${msi_path}" /tmp/release/m1-3-app-windows-x64.msi
+          cp "${msi_path}" /tmp/release/m4-1-userApp-tauri-windows-x64.msi
 
-      - name: Upload m1-3-app Windows artifacts
+      - name: Upload m4-1-userApp-tauri Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: m1-3-app-windows
+          name: m4-1-userApp-tauri-windows
           path: |
-            /tmp/release/m1-3-app-windows-x64.msi
+            /tmp/release/m4-1-userApp-tauri-windows-x64.msi
           if-no-files-found: warn
 
-      - name: Upload m1-3-app Windows artifacts to private release
+      - name: Upload m4-1-userApp-tauri Windows artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -361,11 +361,11 @@ jobs:
           bash workspace/.github/script/gh-release.sh upload \
             "${release_tag}" \
             "${PRIVATE_RELEASE_REPO}" \
-            /tmp/release/m1-3-app-windows-x64.msi
+            /tmp/release/m4-1-userApp-tauri-windows-x64.msi
 
   build-macos:
-    name: Build m1-3-app macOS .dmg + iOS simulator .app.ipa
-    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-desktop"]'), inputs.build_target) }}
+    name: Build m4-1-userApp-tauri macOS .dmg + iOS simulator .app.ipa
+    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-desktop"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -378,7 +378,7 @@ jobs:
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-3-app macOS/iOS
+      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri macOS/iOS
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -387,7 +387,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-3-app macOS/iOS workspace to requested source ref
+      - name: Switch m4-1-userApp-tauri macOS/iOS workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -397,21 +397,21 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m1-3-app macOS/iOS
+      - name: Setup Rust for m4-1-userApp-tauri macOS/iOS
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Add Apple targets for m1-3-app macOS/iOS
+      - name: Add Apple targets for m4-1-userApp-tauri macOS/iOS
         shell: bash
         run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
 
-      - name: Download shared frontend tauri assets for m1-3-app macOS/iOS
+      - name: Download shared frontend tauri assets for m4-1-userApp-tauri macOS/iOS
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend-old/dist-tauri
+          path: workspace/frontend/dist
 
-      - name: Build m1-3-app macOS .dmg
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri macOS .dmg
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
@@ -420,44 +420,44 @@ jobs:
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri build --bundles dmg
 
-      - name: Initialize m1-3-app iOS project
-        working-directory: workspace/m1-3-app
+      - name: Initialize m4-1-userApp-tauri iOS project
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         run: |
           set -euo pipefail
           cargo install tauri-cli --version "^2" --locked || true
           cargo tauri ios init --ci --skip-targets-install
 
-      - name: Build m1-3-app iOS simulator app
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri iOS simulator app
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri ios build --target aarch64-sim --ci
 
-      - name: Package m1-3-app iOS simulator .app.ipa artifact
+      - name: Package m4-1-userApp-tauri iOS simulator .app.ipa artifact
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           dmg_path="$(find workspace/target/release/bundle -type f -name '*.dmg' | head -1)"
           test -n "${dmg_path}"
-          cp "${dmg_path}" /tmp/release/m1-3-app-macos.dmg
-          app_path="$(find workspace/m1-3-app/gen/apple/build -type d -name '*.app' | head -1)"
+          cp "${dmg_path}" /tmp/release/m4-1-userApp-tauri-macos.dmg
+          app_path="$(find workspace/m4-1-userApp-tauri/gen/apple/build -type d -name '*.app' | head -1)"
           test -n "${app_path}"
           cp -R "${app_path}" /tmp/release/
-          ditto -c -k --keepParent "${app_path}" "/tmp/release/m1-3-app-ios-simulator.app.ipa"
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/m4-1-userApp-tauri-ios-simulator.app.ipa"
 
-      - name: Upload m1-3-app macOS/iOS artifacts
+      - name: Upload m4-1-userApp-tauri macOS/iOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: m1-3-app-apple
+          name: m4-1-userApp-tauri-apple
           path: |
-            /tmp/release/m1-3-app-macos.dmg
-            /tmp/release/m1-3-app-ios-simulator.app.ipa
+            /tmp/release/m4-1-userApp-tauri-macos.dmg
+            /tmp/release/m4-1-userApp-tauri-ios-simulator.app.ipa
           if-no-files-found: warn
 
-      - name: Upload m1-3-app macOS/iOS artifacts to private release
+      - name: Upload m4-1-userApp-tauri macOS/iOS artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -470,8 +470,8 @@ jobs:
             files+=("${file}")
           done < <(
             {
-              find /tmp/release -maxdepth 1 -type f -name 'm1-3-app-macos.dmg' 2>/dev/null
-              find /tmp/release -maxdepth 1 -type f -name 'm1-3-app-ios-simulator.app.ipa' 2>/dev/null
+              find /tmp/release -maxdepth 1 -type f -name 'm4-1-userApp-tauri-macos.dmg' 2>/dev/null
+              find /tmp/release -maxdepth 1 -type f -name 'm4-1-userApp-tauri-ios-simulator.app.ipa' 2>/dev/null
             } | sort
           )
           ((${#files[@]} > 0))
@@ -481,8 +481,8 @@ jobs:
             "${files[@]}"
 
   build-android:
-    name: Build m1-3-app Android (.apk)
-    if: ${{ contains(fromJSON('["all","m1-3-app","m1-3-app-android"]'), inputs.build_target) }}
+    name: Build m4-1-userApp-tauri Android (.apk)
+    if: ${{ contains(fromJSON('["all","m4-1-userApp-tauri","m4-1-userApp-tauri-android"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
       - prepare-shared-frontend-assets
@@ -495,7 +495,7 @@ jobs:
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-3-app Android
+      - name: Checkout lot-manager-aio workspace for m4-1-userApp-tauri Android
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -504,7 +504,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-3-app Android workspace to requested source ref
+      - name: Switch m4-1-userApp-tauri Android workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -514,59 +514,59 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m1-3-app Android
+      - name: Setup Rust for m4-1-userApp-tauri Android
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Java for m1-3-app Android
+      - name: Setup Java for m4-1-userApp-tauri Android
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK for m1-3-app
+      - name: Setup Android SDK for m4-1-userApp-tauri
         uses: android-actions/setup-android@v3
 
-      - name: Add Android Rust targets for m1-3-app
+      - name: Add Android Rust targets for m4-1-userApp-tauri
         shell: bash
         run: |
           set -euo pipefail
           rustup target add aarch64-linux-android x86_64-linux-android armv7-linux-androideabi
           cargo install tauri-cli --version "^2" --locked || true
 
-      - name: Install Android NDK for m1-3-app
+      - name: Install Android NDK for m4-1-userApp-tauri
         shell: bash
         run: |
           set -euo pipefail
           sdkmanager --install "ndk;27.0.12077973" --channel=0
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
-      - name: Download shared frontend tauri assets for m1-3-app Android
+      - name: Download shared frontend tauri assets for m4-1-userApp-tauri Android
         uses: actions/download-artifact@v4
         with:
           name: frontend-tauri-dist
-          path: workspace/frontend-old/dist-tauri
+          path: workspace/frontend/dist
 
-      - name: Initialize m1-3-app Android project
-        working-directory: workspace/m1-3-app
+      - name: Initialize m4-1-userApp-tauri Android project
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         run: cargo tauri android init --ci --skip-targets-install
 
-      - name: Build m1-3-app Android universal APK and AAB
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri Android universal APK and AAB
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --aab
 
-      - name: Build m1-3-app Android split APKs
-        working-directory: workspace/m1-3-app
+      - name: Build m4-1-userApp-tauri Android split APKs
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         env:
           LOT_SKIP_FRONTEND_BUILD: "true"
         run: cargo tauri android build --target aarch64 armv7 x86_64 --apk --split-per-abi
 
-      - name: Sign m1-3-app Android APK
-        working-directory: workspace/m1-3-app
+      - name: Sign m4-1-userApp-tauri Android APK
+        working-directory: workspace/m4-1-userApp-tauri
         shell: bash
         run: |
           set -euo pipefail
@@ -599,23 +599,23 @@ jobs:
 
             case "$(basename "${signed_apk}")" in
               *universal*.apk)
-                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-universal.apk
+                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-universal.apk
                 ;;
               *arm64-v8a*.apk|*aarch64*.apk|*arm64*.apk)
-                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-arm64-v8a.apk
+                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-arm64-v8a.apk
                 ;;
               *armeabi-v7a*.apk|*armv7*.apk|*arm-release*.apk)
-                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-armeabi-v7a.apk
+                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-armeabi-v7a.apk
                 ;;
               *x86_64*.apk)
-                cp "${signed_apk}" /tmp/release/android/m1-3-app-android-x86_64.apk
+                cp "${signed_apk}" /tmp/release/android/m4-1-userApp-tauri-android-x86_64.apk
                 ;;
             esac
           done < <(find gen/android -type f -name '*-unsigned.apk' | sort)
 
           unsigned_aab="$(find gen/android -type f -name '*.aab' | head -1)"
           test -n "${unsigned_aab}"
-          signed_aab="/tmp/release/android/m1-3-app-android.aab"
+          signed_aab="/tmp/release/android/m4-1-userApp-tauri-android.aab"
           jarsigner \
             -keystore "${keystore_path}" \
             -storepass "${store_password}" \
@@ -624,15 +624,15 @@ jobs:
             "${unsigned_aab}" \
             "${key_alias}"
 
-      - name: Upload m1-3-app Android artifacts
+      - name: Upload m4-1-userApp-tauri Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: m1-3-app-android
+          name: m4-1-userApp-tauri-android
           path: |
             /tmp/release/android/*
           if-no-files-found: warn
 
-      - name: Upload m1-3-app Android artifacts to private release
+      - name: Upload m4-1-userApp-tauri Android artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -807,22 +807,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
 
-  build-m2-1-listener-linux-x86_64:
-    name: Build m2-1-listener Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-1-listener"]'), inputs.build_target) }}
+  build-m2-1-listener-rs-linux-x86_64:
+    name: Build m2-1-listener-rs Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m2-1-listener-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-1-listener-linux-x86_64
+      OUTPUT_NAME: m2-1-listener-rs-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-1-listener x86_64
+      - name: Checkout lot-manager-aio workspace for m2-1-listener-rs x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -831,7 +831,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-1-listener x86_64 workspace to requested source ref
+      - name: Switch m2-1-listener-rs x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -841,33 +841,33 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m2-1-listener x86_64
+      - name: Setup Rust for m2-1-listener-rs x86_64
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build m2-1-listener x86_64 binary
+      - name: Build m2-1-listener-rs x86_64 binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release -p m2-1-listener --target "${TARGET_TRIPLE}"
+          cargo build --release -p m2-1-listener-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m2-1-listener x86_64 .gz artifacts
+      - name: Collect m2-1-listener-rs x86_64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener-rs"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-1-listener-x86_64
+          name: binary-m2-1-listener-rs-x86_64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-1-listener x86_64 artifacts to private release
+      - name: Upload m2-1-listener-rs x86_64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -880,22 +880,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-1-listener-linux-arm64-musl:
-    name: Build m2-1-listener Linux arm64 musl .gz
-    if: ${{ contains(fromJSON('["all","m2-1-listener"]'), inputs.build_target) }}
+  build-m2-1-listener-rs-linux-arm64-musl:
+    name: Build m2-1-listener-rs Linux arm64 musl .gz
+    if: ${{ contains(fromJSON('["all","m2-1-listener-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m2-1-listener-linux-arm64-musl
+      OUTPUT_NAME: m2-1-listener-rs-linux-arm64-musl
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-1-listener arm64 musl
+      - name: Checkout lot-manager-aio workspace for m2-1-listener-rs arm64 musl
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -904,7 +904,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-1-listener arm64 musl workspace to requested source ref
+      - name: Switch m2-1-listener-rs arm64 musl workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -914,7 +914,7 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m2-1-listener arm64 musl
+      - name: Setup Rust for m2-1-listener-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-unknown-linux-musl
@@ -927,30 +927,30 @@ jobs:
       - name: Setup Zig for musl cross-compilation
         uses: mlugg/setup-zig@v2
 
-      - name: Build m2-1-listener arm64 musl binary
+      - name: Build m2-1-listener-rs arm64 musl binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo zigbuild --release -p m2-1-listener --target "${TARGET_TRIPLE}"
+          cargo zigbuild --release -p m2-1-listener-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m2-1-listener arm64 musl .gz artifacts
+      - name: Collect m2-1-listener-rs arm64 musl .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener"
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-1-listener-rs"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-1-listener-arm64-musl
+          name: binary-m2-1-listener-rs-arm64-musl
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-1-listener arm64 musl artifacts to private release
+      - name: Upload m2-1-listener-rs arm64 musl artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -963,22 +963,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-2-archive-query-linux-x86_64:
-    name: Build m2-2-archive-query Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-2-archive-query"]'), inputs.build_target) }}
+  build-m2-2-archive-query-rs-linux-x86_64:
+    name: Build m2-2-archive-query-rs Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m2-2-archive-query-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: x86_64-unknown-linux-gnu
-      OUTPUT_NAME: m2-2-archive-query-linux-x86_64
+      OUTPUT_NAME: m2-2-archive-query-rs-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-2-archive-query x86_64
+      - name: Checkout lot-manager-aio workspace for m2-2-archive-query-rs x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -987,7 +987,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-2-archive-query x86_64 workspace to requested source ref
+      - name: Switch m2-2-archive-query-rs x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -997,33 +997,33 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m2-2-archive-query x86_64
+      - name: Setup Rust for m2-2-archive-query-rs x86_64
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build m2-2-archive-query x86_64 binary
+      - name: Build m2-2-archive-query-rs x86_64 binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release -p m2-2-archive-query --target "${TARGET_TRIPLE}"
+          cargo build --release -p m2-2-archive-query-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m2-2-archive-query x86_64 .gz artifacts
+      - name: Collect m2-2-archive-query-rs x86_64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query"
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query-rs"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-2-archive-query-x86_64
+          name: binary-m2-2-archive-query-rs-x86_64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-2-archive-query x86_64 artifacts to private release
+      - name: Upload m2-2-archive-query-rs x86_64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1036,22 +1036,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-2-archive-query-linux-arm64-musl:
-    name: Build m2-2-archive-query Linux arm64 musl .gz
-    if: ${{ contains(fromJSON('["all","m2-2-archive-query"]'), inputs.build_target) }}
+  build-m2-2-archive-query-rs-linux-arm64-musl:
+    name: Build m2-2-archive-query-rs Linux arm64 musl .gz
+    if: ${{ contains(fromJSON('["all","m2-2-archive-query-rs"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       TARGET_TRIPLE: aarch64-unknown-linux-musl
-      OUTPUT_NAME: m2-2-archive-query-linux-arm64-musl
+      OUTPUT_NAME: m2-2-archive-query-rs-linux-arm64-musl
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-2-archive-query arm64 musl
+      - name: Checkout lot-manager-aio workspace for m2-2-archive-query-rs arm64 musl
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1060,7 +1060,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-2-archive-query arm64 musl workspace to requested source ref
+      - name: Switch m2-2-archive-query-rs arm64 musl workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1070,7 +1070,7 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust for m2-2-archive-query arm64 musl
+      - name: Setup Rust for m2-2-archive-query-rs arm64 musl
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-unknown-linux-musl
@@ -1083,30 +1083,30 @@ jobs:
       - name: Setup Zig for musl cross-compilation
         uses: mlugg/setup-zig@v2
 
-      - name: Build m2-2-archive-query arm64 musl binary
+      - name: Build m2-2-archive-query-rs arm64 musl binary
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          cargo zigbuild --release -p m2-2-archive-query --target "${TARGET_TRIPLE}"
+          cargo zigbuild --release -p m2-2-archive-query-rs --target "${TARGET_TRIPLE}"
 
-      - name: Collect m2-2-archive-query arm64 musl .gz artifacts
+      - name: Collect m2-2-archive-query-rs arm64 musl .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query"
+          binary_path="workspace/target/${TARGET_TRIPLE}/release/m2-2-archive-query-rs"
           test -f "${binary_path}"
           gzip -c "${binary_path}" > "/tmp/release/${OUTPUT_NAME}.gz"
 
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-2-archive-query-arm64-musl
+          name: binary-m2-2-archive-query-rs-arm64-musl
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-2-archive-query arm64 musl artifacts to private release
+      - name: Upload m2-2-archive-query-rs arm64 musl artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1119,23 +1119,23 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m0-1-center-linux-x86_64:
-    name: Build m0-1-center Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m0-1-center"]'), inputs.build_target) }}
+  build-m0-1-center-go-linux-x86_64:
+    name: Build m0-1-center-go Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m0-1-center-go"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       GOOS: linux
       GOARCH: amd64
-      OUTPUT_NAME: m0-1-center-linux-x86_64
+      OUTPUT_NAME: m0-1-center-go-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m0-1-center x86_64
+      - name: Checkout lot-manager-aio workspace for m0-1-center-go x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1144,7 +1144,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m0-1-center x86_64 workspace to requested source ref
+      - name: Switch m0-1-center-go x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1154,16 +1154,16 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Go for m0-1-center x86_64
+      - name: Setup Go for m0-1-center-go x86_64
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.5"
           cache-dependency-path: |
             workspace/go.work.sum
-            workspace/lot-go-shared/go.sum
-            workspace/m0-1-center/go.sum
+            workspace/lot-shared-lib/golang/go.sum
+            workspace/m0-1-center-go/go.sum
 
-      - name: Build m0-1-center x86_64 binary
+      - name: Build m0-1-center-go x86_64 binary
         working-directory: workspace
         shell: bash
         run: |
@@ -1171,9 +1171,9 @@ jobs:
           mkdir -p /tmp/release
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
             -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m0-1-center/cmd/m0-1-center
+            ./m0-1-center-go/cmd/m0-1-center
 
-      - name: Collect m0-1-center x86_64 .gz artifacts
+      - name: Collect m0-1-center-go x86_64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -1183,11 +1183,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m0-1-center-x86_64
+          name: binary-m0-1-center-go-x86_64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m0-1-center x86_64 artifacts to private release
+      - name: Upload m0-1-center-go x86_64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1200,23 +1200,23 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m0-1-center-linux-arm64:
-    name: Build m0-1-center Linux arm64 .gz
-    if: ${{ contains(fromJSON('["all","m0-1-center"]'), inputs.build_target) }}
+  build-m0-1-center-go-linux-arm64:
+    name: Build m0-1-center-go Linux arm64 .gz
+    if: ${{ contains(fromJSON('["all","m0-1-center-go"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       GOOS: linux
       GOARCH: arm64
-      OUTPUT_NAME: m0-1-center-linux-arm64
+      OUTPUT_NAME: m0-1-center-go-linux-arm64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m0-1-center arm64
+      - name: Checkout lot-manager-aio workspace for m0-1-center-go arm64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1225,7 +1225,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m0-1-center arm64 workspace to requested source ref
+      - name: Switch m0-1-center-go arm64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1235,16 +1235,16 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Go for m0-1-center arm64
+      - name: Setup Go for m0-1-center-go arm64
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.5"
           cache-dependency-path: |
             workspace/go.work.sum
-            workspace/lot-go-shared/go.sum
-            workspace/m0-1-center/go.sum
+            workspace/lot-shared-lib/golang/go.sum
+            workspace/m0-1-center-go/go.sum
 
-      - name: Build m0-1-center arm64 binary
+      - name: Build m0-1-center-go arm64 binary
         working-directory: workspace
         shell: bash
         run: |
@@ -1252,9 +1252,9 @@ jobs:
           mkdir -p /tmp/release
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
             -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m0-1-center/cmd/m0-1-center
+            ./m0-1-center-go/cmd/m0-1-center
 
-      - name: Collect m0-1-center arm64 .gz artifacts
+      - name: Collect m0-1-center-go arm64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -1264,11 +1264,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m0-1-center-arm64
+          name: binary-m0-1-center-go-arm64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m0-1-center arm64 artifacts to private release
+      - name: Upload m0-1-center-go arm64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1281,23 +1281,23 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-4-dev-reg-linux-x86_64:
-    name: Build m2-4-dev-reg Linux x86_64 .gz
-    if: ${{ contains(fromJSON('["all","m2-4-dev-reg"]'), inputs.build_target) }}
+  build-m2-4-dev-reg-go-linux-x86_64:
+    name: Build m2-4-dev-reg-go Linux x86_64 .gz
+    if: ${{ contains(fromJSON('["all","m2-4-dev-reg-go"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       GOOS: linux
       GOARCH: amd64
-      OUTPUT_NAME: m2-4-dev-reg-linux-x86_64
+      OUTPUT_NAME: m2-4-dev-reg-go-linux-x86_64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg x86_64
+      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg-go x86_64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1306,7 +1306,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-4-dev-reg x86_64 workspace to requested source ref
+      - name: Switch m2-4-dev-reg-go x86_64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1316,16 +1316,16 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Go for m2-4-dev-reg x86_64
+      - name: Setup Go for m2-4-dev-reg-go x86_64
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.5"
           cache-dependency-path: |
             workspace/go.work.sum
-            workspace/lot-go-shared/go.sum
-            workspace/m2-4-dev-reg/go.sum
+            workspace/lot-shared-lib/golang/go.sum
+            workspace/m2-4-dev-reg-go/go.sum
 
-      - name: Build m2-4-dev-reg x86_64 binary
+      - name: Build m2-4-dev-reg-go x86_64 binary
         working-directory: workspace
         shell: bash
         run: |
@@ -1333,9 +1333,9 @@ jobs:
           mkdir -p /tmp/release
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
             -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m2-4-dev-reg/cmd/m2-4-dev-reg
+            ./m2-4-dev-reg-go/cmd/m2-4-dev-reg
 
-      - name: Collect m2-4-dev-reg x86_64 .gz artifacts
+      - name: Collect m2-4-dev-reg-go x86_64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -1345,11 +1345,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-4-dev-reg-x86_64
+          name: binary-m2-4-dev-reg-go-x86_64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-4-dev-reg x86_64 artifacts to private release
+      - name: Upload m2-4-dev-reg-go x86_64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1362,23 +1362,23 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}.gz
 
-  build-m2-4-dev-reg-linux-arm64:
-    name: Build m2-4-dev-reg Linux arm64 .gz
-    if: ${{ contains(fromJSON('["all","m2-4-dev-reg"]'), inputs.build_target) }}
+  build-m2-4-dev-reg-go-linux-arm64:
+    name: Build m2-4-dev-reg-go Linux arm64 .gz
+    if: ${{ contains(fromJSON('["all","m2-4-dev-reg-go"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       GOOS: linux
       GOARCH: arm64
-      OUTPUT_NAME: m2-4-dev-reg-linux-arm64
+      OUTPUT_NAME: m2-4-dev-reg-go-linux-arm64
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg arm64
+      - name: Checkout lot-manager-aio workspace for m2-4-dev-reg-go arm64
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1387,7 +1387,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m2-4-dev-reg arm64 workspace to requested source ref
+      - name: Switch m2-4-dev-reg-go arm64 workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1397,16 +1397,16 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Go for m2-4-dev-reg arm64
+      - name: Setup Go for m2-4-dev-reg-go arm64
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.5"
           cache-dependency-path: |
             workspace/go.work.sum
-            workspace/lot-go-shared/go.sum
-            workspace/m2-4-dev-reg/go.sum
+            workspace/lot-shared-lib/golang/go.sum
+            workspace/m2-4-dev-reg-go/go.sum
 
-      - name: Build m2-4-dev-reg arm64 binary
+      - name: Build m2-4-dev-reg-go arm64 binary
         working-directory: workspace
         shell: bash
         run: |
@@ -1414,9 +1414,9 @@ jobs:
           mkdir -p /tmp/release
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
             -o "/tmp/release/${OUTPUT_NAME}" \
-            ./m2-4-dev-reg/cmd/m2-4-dev-reg
+            ./m2-4-dev-reg-go/cmd/m2-4-dev-reg
 
-      - name: Collect m2-4-dev-reg arm64 .gz artifacts
+      - name: Collect m2-4-dev-reg-go arm64 .gz artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -1426,11 +1426,11 @@ jobs:
       - name: Upload artifact for Docker combined image
         uses: actions/upload-artifact@v4
         with:
-          name: binary-m2-4-dev-reg-arm64
+          name: binary-m2-4-dev-reg-go-arm64
           path: /tmp/release/${{ env.OUTPUT_NAME }}.gz
           if-no-files-found: error
 
-      - name: Upload m2-4-dev-reg arm64 artifacts to private release
+      - name: Upload m2-4-dev-reg-go arm64 artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1449,10 +1449,10 @@ jobs:
     needs:
       - prepare-private-release
       - build-m1-1-app-api-rs-linux-x86_64
-      - build-m0-1-center-linux-x86_64
-      - build-m2-4-dev-reg-linux-x86_64
-      - build-m2-1-listener-linux-x86_64
-      - build-m2-2-archive-query-linux-x86_64
+      - build-m0-1-center-go-linux-x86_64
+      - build-m2-4-dev-reg-go-linux-x86_64
+      - build-m2-1-listener-rs-linux-x86_64
+      - build-m2-2-archive-query-rs-linux-x86_64
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -1488,28 +1488,28 @@ jobs:
           name: binary-m1-1-app-api-rs-x86_64
           path: /tmp/docker-artifacts
 
-      - name: Download m2-1-listener binary
+      - name: Download m2-1-listener-rs binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-1-listener-x86_64
+          name: binary-m2-1-listener-rs-x86_64
           path: /tmp/docker-artifacts
 
-      - name: Download m2-2-archive-query binary
+      - name: Download m2-2-archive-query-rs binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-2-archive-query-x86_64
+          name: binary-m2-2-archive-query-rs-x86_64
           path: /tmp/docker-artifacts
 
-      - name: Download m0-1-center binary
+      - name: Download m0-1-center-go binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m0-1-center-x86_64
+          name: binary-m0-1-center-go-x86_64
           path: /tmp/docker-artifacts
 
-      - name: Download m2-4-dev-reg binary
+      - name: Download m2-4-dev-reg-go binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-4-dev-reg-x86_64
+          name: binary-m2-4-dev-reg-go-x86_64
           path: /tmp/docker-artifacts
 
 
@@ -1572,10 +1572,10 @@ jobs:
     needs:
       - prepare-private-release
       - build-m1-1-app-api-rs-linux-arm64-musl
-      - build-m0-1-center-linux-arm64
-      - build-m2-4-dev-reg-linux-arm64
-      - build-m2-1-listener-linux-arm64-musl
-      - build-m2-2-archive-query-linux-arm64-musl
+      - build-m0-1-center-go-linux-arm64
+      - build-m2-4-dev-reg-go-linux-arm64
+      - build-m2-1-listener-rs-linux-arm64-musl
+      - build-m2-2-archive-query-rs-linux-arm64-musl
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
@@ -1611,28 +1611,28 @@ jobs:
           name: binary-m1-1-app-api-rs-arm64-musl
           path: /tmp/docker-artifacts
 
-      - name: Download m2-1-listener binary
+      - name: Download m2-1-listener-rs binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-1-listener-arm64-musl
+          name: binary-m2-1-listener-rs-arm64-musl
           path: /tmp/docker-artifacts
 
-      - name: Download m2-2-archive-query binary
+      - name: Download m2-2-archive-query-rs binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-2-archive-query-arm64-musl
+          name: binary-m2-2-archive-query-rs-arm64-musl
           path: /tmp/docker-artifacts
 
-      - name: Download m0-1-center binary
+      - name: Download m0-1-center-go binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m0-1-center-arm64
+          name: binary-m0-1-center-go-arm64
           path: /tmp/docker-artifacts
 
-      - name: Download m2-4-dev-reg binary
+      - name: Download m2-4-dev-reg-go binary
         uses: actions/download-artifact@v4
         with:
-          name: binary-m2-4-dev-reg-arm64
+          name: binary-m2-4-dev-reg-go-arm64
           path: /tmp/docker-artifacts
 
 
@@ -1693,8 +1693,8 @@ jobs:
             /tmp/release/${{ env.OUTPUT_NAME }}
 
   build-esp32c3-classicsimple-firmware:
-    name: Build m3-v1 esp32c3-classicsimple firmware
-    if: ${{ contains(fromJSON('["all","m3-v1-esp32c3-classicsimple-firmware"]'), inputs.build_target) }}
+    name: Build m3-rs esp32c3-classicsimple firmware
+    if: ${{ contains(fromJSON('["all","m3-rs-esp32c3-classicsimple-firmware"]'), inputs.build_target) }}
     needs: prepare-private-release
     runs-on: ubuntu-latest
     env:
@@ -1706,7 +1706,7 @@ jobs:
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m3-v1 esp32c3-classicsimple
+      - name: Checkout lot-manager-aio workspace for m3-rs esp32c3-classicsimple
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -1715,7 +1715,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m3-v1 esp32c3-classicsimple workspace to requested source ref
+      - name: Switch m3-rs esp32c3-classicsimple workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -1725,17 +1725,17 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust nightly for m3-v1 esp32c3-classicsimple
+      - name: Setup Rust nightly for m3-rs esp32c3-classicsimple
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-05-08
           components: rust-src
 
-      - name: Install ldproxy for m3-v1 esp32c3-classicsimple
+      - name: Install ldproxy for m3-rs esp32c3-classicsimple
         shell: bash
         run: cargo install ldproxy --locked
 
-      - name: Install ESP-IDF system dependencies for m3-v1 esp32c3-classicsimple
+      - name: Install ESP-IDF system dependencies for m3-rs esp32c3-classicsimple
         shell: bash
         run: |
           set -euo pipefail
@@ -1757,8 +1757,8 @@ jobs:
             dfu-util \
             libusb-1.0-0
 
-      - name: Prepare m3-v1 esp32c3-classicsimple firmware config
-        working-directory: workspace/m3-v1
+      - name: Prepare m3-rs esp32c3-classicsimple firmware config
+        working-directory: workspace/m3-rs
         shell: bash
         run: |
           set -euo pipefail
@@ -1766,8 +1766,8 @@ jobs:
           bash ../script/dev_bash/prepare-m3-sdkconfig.sh
           cp sdkconfig.defaults sdkconfig
 
-      - name: Build m3-v1 esp32c3-classicsimple firmware ELF
-        working-directory: workspace/m3-v1
+      - name: Build m3-rs esp32c3-classicsimple firmware ELF
+        working-directory: workspace/m3-rs
         shell: bash
         run: |
           set -euo pipefail
@@ -1788,34 +1788,34 @@ jobs:
               --features esp32c3 \
               --target riscv32imc-esp-espidf
 
-      - name: Collect m3-v1 esp32c3-classicsimple firmware artifacts
+      - name: Collect m3-rs esp32c3-classicsimple firmware artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           firmware_path="workspace/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
           if [[ ! -f "${firmware_path}" ]]; then
-            firmware_path="workspace/m3-v1/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
+            firmware_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/lot-manager-m3-firmware-esp32c3"
           fi
           test -f "${firmware_path}"
           partition_table_path="workspace/target/riscv32imc-esp-espidf/release/partition-table.bin"
           if [[ ! -f "${partition_table_path}" ]]; then
-            partition_table_path="workspace/m3-v1/target/riscv32imc-esp-espidf/release/partition-table.bin"
+            partition_table_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/partition-table.bin"
           fi
           test -f "${partition_table_path}"
           bootloader_path="workspace/target/riscv32imc-esp-espidf/release/bootloader.bin"
           if [[ ! -f "${bootloader_path}" ]]; then
-            bootloader_path="workspace/m3-v1/target/riscv32imc-esp-espidf/release/bootloader.bin"
+            bootloader_path="workspace/m3-rs/target/riscv32imc-esp-espidf/release/bootloader.bin"
           fi
           test -f "${bootloader_path}"
           cp "${firmware_path}" "/tmp/release/${OUTPUT_NAME}"
           cp "${partition_table_path}" /tmp/release/M3-v1-esp32c3-classicsimple-partition-table.bin
           cp "${bootloader_path}" /tmp/release/M3-v1-esp32c3-classicsimple-bootloader.bin
-          cp workspace/m3-v1/config.toml /tmp/release/M3-v1-esp32c3-classicsimple-config.toml.example
-          cp workspace/m3-v1/sdkconfig.defaults /tmp/release/M3-v1-esp32c3-classicsimple-sdkconfig.defaults
-          cp workspace/m3-v1/partitions.csv /tmp/release/M3-v1-esp32c3-classicsimple-partitions.csv
+          cp workspace/m3-rs/config.toml /tmp/release/M3-v1-esp32c3-classicsimple-config.toml.example
+          cp workspace/m3-rs/sdkconfig.defaults /tmp/release/M3-v1-esp32c3-classicsimple-sdkconfig.defaults
+          cp workspace/m3-rs/partitions.csv /tmp/release/M3-v1-esp32c3-classicsimple-partitions.csv
 
-      - name: Upload m3-v1 esp32c3-classicsimple firmware artifacts to private release
+      - name: Upload m3-rs esp32c3-classicsimple firmware artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -1840,14 +1840,14 @@ jobs:
       - prepare-shared-frontend-assets
       - build-m1-1-app-api-rs-linux-x86_64
       - build-m1-1-app-api-rs-linux-arm64-musl
-      - build-m0-1-center-linux-x86_64
-      - build-m0-1-center-linux-arm64
-      - build-m2-4-dev-reg-linux-x86_64
-      - build-m2-4-dev-reg-linux-arm64
-      - build-m2-1-listener-linux-x86_64
-      - build-m2-1-listener-linux-arm64-musl
-      - build-m2-2-archive-query-linux-x86_64
-      - build-m2-2-archive-query-linux-arm64-musl
+      - build-m0-1-center-go-linux-x86_64
+      - build-m0-1-center-go-linux-arm64
+      - build-m2-4-dev-reg-go-linux-x86_64
+      - build-m2-4-dev-reg-go-linux-arm64
+      - build-m2-1-listener-rs-linux-x86_64
+      - build-m2-1-listener-rs-linux-arm64-musl
+      - build-m2-2-archive-query-rs-linux-x86_64
+      - build-m2-2-archive-query-rs-linux-arm64-musl
       - build-esp32c3-classicsimple-firmware
       - build-lot-manager-aio-x86_64-gnu-docker
       - build-lot-manager-aio-aarch64-musl-docker
@@ -1903,38 +1903,38 @@ jobs:
               m1-1-app-api-rs-linux-arm64-musl.tar.gz)
                 dest="m1-1-app-api-rs-linux-arm64-musl.tar.gz"
                 ;;
-              m0-1-center-linux-x86_64.gz)
-                dest="m0-1-center-linux-x86_64.gz"
+              m0-1-center-go-linux-x86_64.gz)
+                dest="m0-1-center-go-linux-x86_64.gz"
                 ;;
-              m0-1-center-linux-arm64.gz)
-                dest="m0-1-center-linux-arm64.gz"
+              m0-1-center-go-linux-arm64.gz)
+                dest="m0-1-center-go-linux-arm64.gz"
                 ;;
-              m2-4-dev-reg-linux-x86_64.gz)
-                dest="m2-4-dev-reg-linux-x86_64.gz"
+              m2-4-dev-reg-go-linux-x86_64.gz)
+                dest="m2-4-dev-reg-go-linux-x86_64.gz"
                 ;;
-              m2-4-dev-reg-linux-arm64.gz)
-                dest="m2-4-dev-reg-linux-arm64.gz"
+              m2-4-dev-reg-go-linux-arm64.gz)
+                dest="m2-4-dev-reg-go-linux-arm64.gz"
                 ;;
-              m2-1-listener-linux-x86_64.gz)
-                dest="m2-1-listener-linux-x86_64.gz"
+              m2-1-listener-rs-linux-x86_64.gz)
+                dest="m2-1-listener-rs-linux-x86_64.gz"
                 ;;
-              m2-1-listener-linux-arm64-musl.gz)
-                dest="m2-1-listener-linux-arm64-musl.gz"
+              m2-1-listener-rs-linux-arm64-musl.gz)
+                dest="m2-1-listener-rs-linux-arm64-musl.gz"
                 ;;
-              m2-2-archive-query-linux-x86_64.gz)
-                dest="m2-2-archive-query-linux-x86_64.gz"
+              m2-2-archive-query-rs-linux-x86_64.gz)
+                dest="m2-2-archive-query-rs-linux-x86_64.gz"
                 ;;
-              m2-2-archive-query-linux-arm64-musl.gz)
-                dest="m2-2-archive-query-linux-arm64-musl.gz"
+              m2-2-archive-query-rs-linux-arm64-musl.gz)
+                dest="m2-2-archive-query-rs-linux-arm64-musl.gz"
                 ;;
-              m1-2-ops-console-linux-x86_64.tar.gz)
-                dest="m1-2-ops-console-linux-x86_64.tar.gz"
+              m1-2-ops-console-ts-linux-x86_64.tar.gz)
+                dest="m1-2-ops-console-ts-linux-x86_64.tar.gz"
                 ;;
-              m1-2-ops-console-linux-x86_64-single.zst)
-                dest="m1-2-ops-console-linux-x86_64-single.zst"
+              m1-2-ops-console-ts-linux-x86_64-single.zst)
+                dest="m1-2-ops-console-ts-linux-x86_64-single.zst"
                 ;;
-              m1-3-app-linux-x86_64.gz)
-                dest="m1-3-app-linux-x86_64.gz"
+              m4-1-userApp-tauri-linux-x86_64.gz)
+                dest="m4-1-userApp-tauri-linux-x86_64.gz"
                 ;;
               M3-v1-esp32c3-classicsimple-firmware.elf)
                 dest="M3-v1-esp32c3-classicsimple-firmware.elf"
@@ -1954,7 +1954,7 @@ jobs:
               M3-v1-esp32c3-classicsimple-partitions.csv)
                 dest="M3-v1-esp32c3-classicsimple-partitions.csv"
                 ;;
-              m3-v1-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf)
+              m3-rs-esp32c3-classicsimple-firmware-riscv32imc-esp-espidf.elf)
                 dest="M3-v1-esp32c3-classicsimple-firmware.elf"
                 ;;
               partition-table.bin)
@@ -1973,28 +1973,28 @@ jobs:
                 dest="M3-v1-esp32c3-classicsimple-partitions.csv"
                 ;;
               *.msi)
-                dest="m1-3-app-windows-x64.msi"
+                dest="m4-1-userApp-tauri-windows-x64.msi"
                 ;;
               *.dmg)
-                dest="m1-3-app-macos.dmg"
+                dest="m4-1-userApp-tauri-macos.dmg"
                 ;;
               *-ios-simulator.app.ipa)
-                dest="m1-3-app-ios-simulator.app.ipa"
+                dest="m4-1-userApp-tauri-ios-simulator.app.ipa"
                 ;;
               *.aab)
-                dest="m1-3-app-android.aab"
+                dest="m4-1-userApp-tauri-android.aab"
                 ;;
               *universal*.apk)
-                dest="m1-3-app-android-universal.apk"
+                dest="m4-1-userApp-tauri-android-universal.apk"
                 ;;
               *arm64-v8a*.apk|*aarch64*.apk)
-                dest="m1-3-app-android-arm64-v8a.apk"
+                dest="m4-1-userApp-tauri-android-arm64-v8a.apk"
                 ;;
               *armeabi-v7a*.apk|*armv7*.apk)
-                dest="m1-3-app-android-armeabi-v7a.apk"
+                dest="m4-1-userApp-tauri-android-armeabi-v7a.apk"
                 ;;
               *x86_64*.apk)
-                dest="m1-3-app-android-x86_64.apk"
+                dest="m4-1-userApp-tauri-android-x86_64.apk"
                 ;;
               lot-manager-aio-x86_64-gnu-docker.tar.gz)
                 dest="lot-manager-aio-x86_64-gnu-docker.tar.gz"
@@ -2033,22 +2033,22 @@ jobs:
 
   # publish-release: 已删除 — 发布资产统一走 finalize-private-release-assets 上传到 lot-manager-aio
 
-  build-m1-2-ops-console-linux-x86_64:
-    name: Build m1-2-ops-console Linux x86_64 .tar.gz
-    if: ${{ contains(fromJSON('["all","m1-2-ops-console"]'), inputs.build_target) }}
+  build-m1-2-ops-console-ts-linux-x86_64:
+    name: Build m1-2-ops-console-ts Linux x86_64 .tar.gz
+    if: ${{ contains(fromJSON('["all","m1-2-ops-console-ts"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: m1-2-ops-console-linux-x86_64.tar.gz
+      OUTPUT_NAME: m1-2-ops-console-ts-linux-x86_64.tar.gz
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-2-ops-console
+      - name: Checkout lot-manager-aio workspace for m1-2-ops-console-ts
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -2057,7 +2057,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-2-ops-console workspace to requested source ref
+      - name: Switch m1-2-ops-console-ts workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -2075,26 +2075,26 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Build m1-2-ops-console SSR bundle
-        working-directory: workspace/m1-2-ops-console
+      - name: Build m1-2-ops-console-ts SSR bundle
+        working-directory: workspace/m1-2-ops-console-ts
         shell: bash
         run: bun run build
 
-      - name: Collect m1-2-ops-console .tar.gz artifacts
+      - name: Collect m1-2-ops-console-ts .tar.gz artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
           tar_dir="$(mktemp -d)"
-          cp -r workspace/m1-2-ops-console/build "${tar_dir}/build"
-          cp -r workspace/m1-2-ops-console/src/server "${tar_dir}/src/server"
-          cp -r workspace/m1-2-ops-console/package.json "${tar_dir}/package.json"
+          cp -r workspace/m1-2-ops-console-ts/build "${tar_dir}/build"
+          cp -r workspace/m1-2-ops-console-ts/src/server "${tar_dir}/src/server"
+          cp -r workspace/m1-2-ops-console-ts/package.json "${tar_dir}/package.json"
           cd "${tar_dir}"
           tar czf "/tmp/release/${OUTPUT_NAME}" .
           cd /
           rm -rf "${tar_dir}"
 
-      - name: Upload m1-2-ops-console artifacts to private release
+      - name: Upload m1-2-ops-console-ts artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:
@@ -2107,22 +2107,22 @@ jobs:
             "${PRIVATE_RELEASE_REPO}" \
             /tmp/release/${{ env.OUTPUT_NAME }}
 
-  build-m1-2-ops-console-single-linux-x86_64:
-    name: Build m1-2-ops-console single binary Linux x86_64 (.zst)
-    if: ${{ contains(fromJSON('["all","m1-2-ops-console"]'), inputs.build_target) }}
+  build-m1-2-ops-console-ts-single-linux-x86_64:
+    name: Build m1-2-ops-console-ts single binary Linux x86_64 (.zst)
+    if: ${{ contains(fromJSON('["all","m1-2-ops-console-ts"]'), inputs.build_target) }}
     needs:
       - prepare-private-release
     runs-on: ubuntu-latest
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
-      OUTPUT_NAME: m1-2-ops-console-linux-x86_64-single
+      OUTPUT_NAME: m1-2-ops-console-ts-linux-x86_64-single
     steps:
       - name: Checkout lot-Project repo
         uses: actions/checkout@v4
         with:
           path: public
 
-      - name: Checkout lot-manager-aio workspace for m1-2-ops-console single binary
+      - name: Checkout lot-manager-aio workspace for m1-2-ops-console-ts single binary
         uses: actions/checkout@v4
         with:
           repository: ${{ env.PRIVATE_RELEASE_REPO }}
@@ -2131,7 +2131,7 @@ jobs:
           path: workspace
           fetch-depth: 0
 
-      - name: Switch m1-2-ops-console workspace to requested source ref
+      - name: Switch m1-2-ops-console-ts workspace to requested source ref
         working-directory: workspace
         shell: bash
         run: |
@@ -2149,18 +2149,18 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Build m1-2-ops-console single binary
+      - name: Build m1-2-ops-console-ts single binary
         shell: bash
         run: bash workspace/script/dev_bash/build-m12-single.sh bun-linux-x64
 
-      - name: Collect m1-2-ops-console single binary artifacts
+      - name: Collect m1-2-ops-console-ts single binary artifacts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/release
-          cp workspace/m1-2-ops-console/dist/${OUTPUT_NAME}* /tmp/release/
+          cp workspace/m1-2-ops-console-ts/dist/${OUTPUT_NAME}* /tmp/release/
 
-      - name: Upload m1-2-ops-console single binary artifacts to private release
+      - name: Upload m1-2-ops-console-ts single binary artifacts to private release
         if: ${{ env.PUBLISH_RELEASE == 'true' }}
         shell: bash
         env:

@@ -1,4 +1,4 @@
-name: CI M2-1 Listener
+name: CI M1-2 Ops Console
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m2-1-listener-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m1-2-ops-console-ts-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -40,31 +40,30 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
-      - name: Restore Rust build cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: lot-rust-host
-          workspaces: |
-            workspace -> target
-
-      - name: Validate workspace metadata
+      - name: Install workspace dependencies
         working-directory: workspace
         shell: bash
-        run: cargo metadata --format-version 1 --no-deps
+        run: bun install --frozen-lockfile
 
-      - name: Check m2-1-listener
+      - name: Typecheck shared layer
         working-directory: workspace
         shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p m2-1-listener
+        run: bun run --filter @lot-manager/shared typecheck
 
-      - name: Run m2-1-listener tests
-        working-directory: workspace
+      - name: Typecheck m1-2-ops-console-ts
+        working-directory: workspace/m1-2-ops-console-ts
         shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m2-1-listener
+        run: bun run typecheck
+
+      - name: Lint m1-2-ops-console-ts
+        working-directory: workspace/m1-2-ops-console-ts
+        shell: bash
+        run: bun run lint
+
+      - name: Build m1-2-ops-console-ts
+        working-directory: workspace/m1-2-ops-console-ts
+        shell: bash
+        run: bun run build

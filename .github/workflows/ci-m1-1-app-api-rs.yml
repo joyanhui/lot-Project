@@ -91,6 +91,6 @@ jobs:
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
           git diff --exit-code -- \
-            lot-ts-shared/src/generated/error-codes.ts \
+            lot-shared-lib/TypeScript/src/generated/error-codes.ts \
             frontend/openapi-frontend.json \
             frontend/src/generated/openapi-frontend.ts

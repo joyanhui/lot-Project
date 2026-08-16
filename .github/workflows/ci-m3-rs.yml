@@ -1,4 +1,4 @@
-name: CI M1-3 App
+name: CI M3-V1
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-3-app-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m3-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -40,37 +40,31 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install workspace dependencies
-        working-directory: workspace
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Build frontend assets
-        working-directory: workspace/frontend
-        shell: bash
-        run: bun run build
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Linux dependencies for Tauri check
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lot-rust-host
+          workspaces: |
+            workspace -> target
 
       - name: Validate workspace metadata
         working-directory: workspace
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
 
-      - name: Check Tauri shell crate
+      - name: Check m3-rs
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m1-3-app
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-firmware
+
+      - name: Run m3-rs host tests
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware
