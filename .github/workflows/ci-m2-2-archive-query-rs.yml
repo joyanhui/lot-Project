@@ -1,4 +1,4 @@
-name: CI M2-2 Archive Query
+name: CI M2-2 Archive Query Rs
 
 # m2-2-archive-query-rs 归档查询层：ingest 写入 DuckDB 热库（按天/小时分片），
 # convert 队列用 DuckDB COPY 生成 Parquet，upload 队列 token bucket 限速 multipart 上传主 S3，

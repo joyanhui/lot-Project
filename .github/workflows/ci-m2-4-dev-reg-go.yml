@@ -1,4 +1,4 @@
-name: CI M2-4 Dev Reg
+name: CI M2-4 Dev Reg Go
 
 # m2-4-dev-reg-go 设备注册服务：初始化窗口与预设读库、SSID 指纹校验、设备创建与
 # root_key 签发、bitmap 递增；与 m0-1-center-go 握手（注册/心跳/状态/配置拉取）。

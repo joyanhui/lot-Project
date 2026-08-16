@@ -1,4 +1,4 @@
-name: CI M1-3 App
+name: CI M4-1 UserApp Tauri
 
 on:
   workflow_dispatch:

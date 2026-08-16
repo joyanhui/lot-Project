@@ -1,4 +1,4 @@
-name: CI M1-2 Ops Console
+name: CI M1-2 Ops Console Ts
 
 on:
   workflow_dispatch:

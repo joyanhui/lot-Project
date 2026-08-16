@@ -1,4 +1,4 @@
-name: CI M0-1 Center
+name: CI M0-1 Center Go
 
 # m0-1-center-go 运行态中心：调度（节点注册心跳、节点分配、bitmap/root key 同步）、
 # 配置中心（runtime_configs 快照与分发）、离线裁决、告警处理、通知派发、电话报警计费、

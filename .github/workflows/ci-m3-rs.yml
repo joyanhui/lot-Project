@@ -1,4 +1,4 @@
-name: CI M3-V1
+name: CI M3 RS
 
 on:
   workflow_dispatch:
