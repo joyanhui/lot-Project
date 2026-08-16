@@ -1,0 +1,168 @@
+name: lot-AIO-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 是否发布到 release
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      release_tag:
+        description: 发布 tag（如 v0.1.0）
+        default: "v0.1.0"
+        required: true
+        type: string
+      source_ref:
+        description: 源码 ref（如 v0.1.0 或 main）
+        required: true
+        default: "main"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.release_tag }}
+  cancel-in-progress: true
+
+env:
+  PRIVATE_RELEASE_REPO: joyanhui/lot-manager-aio
+  PUBLISH_RELEASE: ${{ inputs.publish_release }}
+  RELEASE_TAG: ${{ inputs.release_tag }}
+  SOURCE_REF: ${{ inputs.source_ref }}
+
+jobs:
+  prepare-private-release:
+    name: Prepare private release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release if missing
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          gh release view "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1 ||
+            gh release create "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" --title "${RELEASE_TAG}" --notes "" ||
+            gh release view "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
+
+  build-linux:
+    name: Build linux ${{ matrix.arch }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            output: linux_x86.tar.zst
+          - arch: arm64
+            output: linux_arm64.tar.zst
+    steps:
+      - name: Checkout lot-manager-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Build via dev.sh build:all
+        working-directory: workspace
+        shell: bash
+        run: nix develop --command bash script/dev.sh build:all "${{ matrix.arch }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}-archive
+          path: workspace/dist/${{ matrix.output }}*
+          if-no-files-found: error
+
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          bash workspace/.github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
+            workspace/dist/${{ matrix.output }} \
+            workspace/dist/${{ matrix.output }}.sha256
+
+  build-ios:
+    name: Build iOS simulator .app.ipa
+    needs: prepare-private-release
+    runs-on: macos-latest
+    env:
+      OUTPUT_NAME: m4-1-userApp-tauri-ios-simulator.app.ipa
+    steps:
+      - name: Checkout lot-manager-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Build iOS simulator app and package ipa
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://bun.sh/install | bash
+          export PATH="$HOME/.bun/bin:$PATH"
+          bun install --frozen-lockfile
+          (cd frontend && LOT_SKIP_CHECKER=1 bun run build)
+          rustup target add aarch64-apple-ios-sim
+          cargo install tauri-cli --version "^2" --locked || true
+          (cd m4-1-userApp-tauri && cargo tauri ios init --ci --skip-targets-install)
+          (cd m4-1-userApp-tauri && LOT_SKIP_FRONTEND_BUILD=true cargo tauri ios build --target aarch64-sim --ci)
+          app_path="$(find m4-1-userApp-tauri/gen/apple/build -type d -name '*.app' | head -1)"
+          test -n "${app_path}"
+          mkdir -p /tmp/release
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/${OUTPUT_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: m4-1-userApp-tauri-ios
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          if-no-files-found: warn
+
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          bash workspace/.github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}

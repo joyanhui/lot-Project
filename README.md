@@ -1,10 +1,10 @@
 # lot-Project
 
-`lot-Project` 是发布与 CI 工程目录，核心入口是 `.github/workflows/release.yml`。该目录用于从私有源码仓库 `joyanhui/lot-manager-aio` 拉取源码，在 nix 开发环境中构建全部产物并发布压缩包资产。
+`lot-Project` 是发布与 CI 工程目录，核心入口是 `.github/workflows/lot-aio-release.yml`。该目录用于从私有源码仓库 `joyanhui/lot-manager-aio` 拉取源码，在 nix 开发环境中构建全部产物并发布压缩包资产。
 
 ## 目录结构
 
-- `.github/workflows/release.yml`：手动 release workflow，通过 `dev.sh build:all` 构建并发布资产。
+- `.github/workflows/lot-aio-release.yml`：手动 release workflow，通过 `dev.sh build:all` 构建并发布资产。
 - `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
 - `.github/workflows/ci-m0-1-center-go.yml`：M0-1 运行态中心 CI（Go）。
 - `.github/workflows/ci-m2-4-dev-reg-go.yml`：M2-4 设备注册服务 CI（Go）。
@@ -16,7 +16,7 @@
 
 ## release workflow
 
-入口：`.github/workflows/release.yml`
+入口：`.github/workflows/lot-aio-release.yml`
 
 输入参数：
 
@@ -30,8 +30,8 @@
 
 ## 构建方式
 
-- x86_64 job：`bash script/dev.sh build:all`，Rust 服务端经 nixpkgs `pkgsCross.musl64` 编译为静态 musl 二进制，产出 `dist/linux_x86.tar.zst`。
-- arm64 job：`bash script/dev.sh build:all arm64`，Rust 服务端经 nixpkgs `pkgsCross.aarch64-multiplatform-musl` 交叉编译为静态 musl 二进制，产出 `dist/linux_arm64.tar.zst`。
+- x86_64 job：`bash script/dev.sh build:all`，Rust 服务端 native glibc 构建（CI 用 runner 系统 gcc，兼容 Debian），产出 `dist/linux_x86.tar.zst`。
+- arm64 job：`bash script/dev.sh build:all arm64`，Rust 服务端经 nixpkgs `pkgsCross.aarch64-multiplatform-musl` 交叉编译为静态 musl 二进制（静态 libstdc++ 取自 Alpine musl 包，链接后 patchelf 清理残留 NEEDED），产出 `dist/linux_arm64.tar.zst`。
 - iOS job（macos）：构建无签名 iOS Simulator `.app`，压缩为 `.app.ipa`（zip 格式，非真机可安装 IPA）。
 
 ## 发布资产
@@ -45,7 +45,7 @@
 ## 与主仓库的关系
 
 - 主仓库源码来源：`https://github.com/joyanhui/lot-manager-aio`。
-- 主仓库触发链路：`.github/workflows/trigger-lot-project-release.yml` → `lot-Project/.github/workflows/release.yml`。
+- 主仓库触发链路：`.github/workflows/trigger-lot-project-release.yml` → `lot-Project/.github/workflows/lot-aio-release.yml`。
 - 发布资产最终上传回 `joyanhui/lot-manager-aio` 的目标 release。
 
 ## 使用方式
