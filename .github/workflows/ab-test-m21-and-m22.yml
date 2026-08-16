@@ -151,24 +151,31 @@ jobs:
           mkdir -p /tmp/loadtest
           nix develop --command bash -c '
             set -euo pipefail
-            trap "pkill -f m0-1-center 2>/dev/null; pkill -f m2-2-archive-query 2>/dev/null; pkill -f m2-1-listener 2>/dev/null || true" EXIT
+            trap "pkill -f m0-1-center 2>/dev/null || true; pkill -f m2-2-archive-query 2>/dev/null || true; pkill -f m2-1-listener 2>/dev/null || true" EXIT
 
             ./dist/stage/x86_64/m0-1-center-go > /tmp/loadtest/m0.log 2>&1 &
             sleep 4
+            echo "--- m0-1 log ---"; tail -5 /tmp/loadtest/m0.log || true
             ./target/release/m2-2-archive-query-rs > /tmp/loadtest/m22.log 2>&1 &
             sleep 4
+            echo "--- m2-2 log ---"; tail -5 /tmp/loadtest/m22.log || true
             ./target/release/m2-1-listener-rs > /tmp/loadtest/m21.log 2>&1 &
             sleep 8
+            echo "--- m2-1 log ---"; tail -8 /tmp/loadtest/m21.log || true
 
             echo "== warmup ${WARMUP_DUR}s =="
             ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${WARMUP_DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
             sleep 10
+            echo "--- warmup tail ---"; tail -3 /tmp/loadtest/warmup.log || true
 
             echo "== steady test ${DUR}s =="
             bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor.csv "${DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-go > /tmp/loadtest/monitor.log 2>&1 &
             MON_PID=$!
-            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log
+            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log || true
             kill ${MON_PID} 2>/dev/null || true
+            echo "--- m2-1 log tail ---"; tail -8 /tmp/loadtest/m21.log || true
+            echo "--- m2-2 log tail ---"; tail -5 /tmp/loadtest/m22.log || true
+            echo "--- m0-1 log tail ---"; tail -5 /tmp/loadtest/m0.log || true
           '
 
       - name: Upload ab-test results
@@ -177,6 +184,7 @@ jobs:
           name: ab-test-m21-m22-${{ github.run_id }}
           path: |
             /tmp/loadtest/devsim.log
+            /tmp/loadtest/warmup.log
             /tmp/loadtest/monitor.csv
             /tmp/loadtest/m0.log
             /tmp/loadtest/m21.log
