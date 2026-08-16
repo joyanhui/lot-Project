@@ -1,0 +1,167 @@
+name: ab-test-m21-and-m22
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 模拟设备数量
+        default: "20000"
+        required: false
+        type: string
+      warmup_dur:
+        description: 预热时长（秒，触发 root key 拉取）
+        default: "90"
+        required: false
+        type: string
+      dur:
+        description: 正式压测时长（秒）
+        default: "240"
+        required: true
+        type: string
+      source_ref:
+        description: 源码 ref（如 main）
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PRIVATE_RELEASE_REPO: joyanhui/lot-manager-aio
+  SOURCE_REF: ${{ inputs.source_ref }}
+
+concurrency:
+  group: ab-test-m21-and-m22
+  cancel-in-progress: false
+
+jobs:
+  ab-test:
+    name: ab-test m2-1/m2-2 (${{ inputs.count }} devices)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: m1_1_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Checkout lot-manager-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Build m0-1 / m2-1 / m2-2 via dev.sh
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop --command bash -c "
+            bash script/dev.sh build:m0-1-center-go x86_64
+            bash script/dev.sh build:m2-1-listener-rs x86_64
+            bash script/dev.sh build:m2-2-archive-query-rs x86_64
+          "
+
+      - name: Run database migration
+        working-directory: workspace
+        shell: bash
+        env:
+          Common_Database_Url: postgres://postgres:postgres@127.0.0.1:5432/m1_1_platform
+        run: nix develop --command bash -c "cargo run -p lot-manager-migration -- up"
+
+      - name: Prepare test users
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ab-test/m1-1-app-api-rs/online-20k/prep.py
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_users.sql
+
+      - name: Prepare test devices
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ab-test/m2-1-m2-2-devices-20k/prep_devices.py
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_devices.sql
+
+      - name: Build devsim
+        working-directory: workspace/ab-test/devsim
+        shell: bash
+        run: nix develop --command bash -c "GOWORK=off go build -buildvcs=false -o devsim ."
+
+      - name: Start services and run ab test
+        working-directory: workspace
+        shell: bash
+        env:
+          M0_1_Config_File: ${{ github.workspace }}/workspace/config.lot.v2.json5
+          M2_2_Device_Status_Sync_Cron: "*/60 * * * * *"
+          M2_1_Server_Max_Connections: "32000"
+          M2_1_Root_Key_Sync_Batch_Size: "30000"
+          DEV_COUNT: ${{ inputs.count }}
+          WARMUP_DUR: ${{ inputs.warmup_dur }}
+          DUR: ${{ inputs.dur }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/loadtest
+          nix develop --command bash -c '
+            set -euo pipefail
+            trap "pkill -f m0-1-center 2>/dev/null; pkill -f m2-2-archive-query 2>/dev/null; pkill -f m2-1-listener 2>/dev/null || true" EXIT
+
+            ./dist/stage/x86_64/m0-1-center-go > /tmp/loadtest/m0.log 2>&1 &
+            sleep 4
+            ./target/release/m2-2-archive-query-rs > /tmp/loadtest/m22.log 2>&1 &
+            sleep 4
+            ./target/release/m2-1-listener-rs > /tmp/loadtest/m21.log 2>&1 &
+            sleep 8
+
+            echo "== warmup ${WARMUP_DUR}s =="
+            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${WARMUP_DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
+            sleep 10
+
+            echo "== steady test ${DUR}s =="
+            bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor.csv "${DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-go > /tmp/loadtest/monitor.log 2>&1 &
+            MON_PID=$!
+            ab-test/devsim/devsim -count "${DEV_COUNT}" -dur "${DUR}s" -devices ab-test/m2-1-m2-2-devices-20k/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log
+            kill ${MON_PID} 2>/dev/null || true
+          '
+
+      - name: Upload ab-test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ab-test-m21-m22-${{ github.run_id }}
+          path: |
+            /tmp/loadtest/devsim.log
+            /tmp/loadtest/monitor.csv
+            /tmp/loadtest/m0.log
+            /tmp/loadtest/m21.log
+            /tmp/loadtest/m22.log
+          if-no-files-found: warn
