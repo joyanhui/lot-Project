@@ -106,6 +106,9 @@ jobs:
               fi
             fi
           done
+          MAXV=$(ls migration/migrations/V*.sql | sed 's/.*\/V0*\([0-9]*\)__.*/\1/' | sort -n | tail -1)
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -c "CREATE TABLE IF NOT EXISTS refinery_schema_history (version INT PRIMARY KEY, name VARCHAR(255), checksum VARCHAR(64), applied_at TIMESTAMPTZ DEFAULT now());"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -c "INSERT INTO refinery_schema_history (version, name, checksum) VALUES (${MAXV}, 'ci_schema_initialized', '') ON CONFLICT (version) DO NOTHING;"
           echo "schema initialized"
 
       - name: Prepare test users
