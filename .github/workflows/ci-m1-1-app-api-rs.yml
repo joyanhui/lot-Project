@@ -89,7 +89,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bun script/tools.ts openapi
+          env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
           git diff --exit-code -- \
             lot-ts-shared/src/generated/error-codes.ts \
             frontend/openapi-frontend.json \
