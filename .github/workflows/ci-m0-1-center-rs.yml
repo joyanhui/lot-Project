@@ -1,0 +1,42 @@
+name: CI M0-1 Center Rust
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "要校验的 lot-manager-aio ref"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-m0-1-center-rs-${{ github.event.inputs.source_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check M0-1 center Rust
+        working-directory: workspace
+        run: |
+          cargo check -p m0-1-center-rs
+          cargo test -p m0-1-center-rs

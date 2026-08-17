@@ -7,7 +7,7 @@
 - `.github/workflows/lot-aio-release.yml`：手动 release workflow，通过 `dev.sh build:all` 构建并发布资产。
 - `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
 - `.github/workflows/ci-m1-2-device-api-rs.yml`：M1-2 设备面 CI。
-- `.github/workflows/ci-m0-1-center-go.yml`：M0-1 运行态中心 CI（Go）。
+- `.github/workflows/ci-m0-1-center-rs.yml`：M0-1 运行态中心 CI（Rust）。
 - `.github/workflows/ci-m4-1-userApp-tauri.yml`：M4-1 Tauri App CI。
 - `.github/workflows/ci-m2-1-listener-rs.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query-rs.yml`：M2-2 归档查询层 CI。

@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           nix develop --command bash -c "
-            bash script/dev.sh build:m0-1-center-go x86_64
+            bash script/dev.sh build:m0-1-center-rs x86_64
             bash script/dev.sh build:m1-2-device-api-rs x86_64
             bash script/dev.sh build:m2-1-listener-rs x86_64
             bash script/dev.sh build:m2-2-archive-query-rs x86_64
@@ -203,7 +203,7 @@ jobs:
             set -euo pipefail
             trap "pkill -f m0-1-center 2>/dev/null || true; pkill -f m1-2-device-api 2>/dev/null || true; pkill -f m2-2-archive-query 2>/dev/null || true; pkill -f m2-1-listener 2>/dev/null || true" EXIT
 
-            ./dist/stage/x86_64/m0-1-center-go > /tmp/loadtest/m0.log 2>&1 &
+            ./dist/stage/x86_64/m0-1-center-rs > /tmp/loadtest/m0.log 2>&1 &
             sleep 4
             echo "--- m0-1 log ---"; tail -3 /tmp/loadtest/m0.log || true
 
@@ -213,7 +213,7 @@ jobs:
               M12_PID=$!
               sleep 6
               echo "--- m1-2 log ---"; tail -5 /tmp/loadtest/m12.log || true
-              bash ab-test/m1-2-device-api-rs/monitor.sh /tmp/loadtest/monitor-m12.csv "${M12_DUR}" m1-2-device-api-rs m0-1-center-go > /tmp/loadtest/monitor-m12.log 2>&1 &
+              bash ab-test/m1-2-device-api-rs/monitor.sh /tmp/loadtest/monitor-m12.csv "${M12_DUR}" m1-2-device-api-rs m0-1-center-rs > /tmp/loadtest/monitor-m12.log 2>&1 &
               MON12_PID=$!
               (cd ab-test/m1-2-device-api-rs && ./loader -mode "${M12_MODE}" -workers "${M12_WORKERS}" -dur "${M12_DUR}s" -base http://127.0.0.1:19312 2>&1 | tee /tmp/loadtest/m12-loader.log) || true
               kill ${MON12_PID} 2>/dev/null || true
@@ -232,7 +232,7 @@ jobs:
               echo "--- m2-1 log ---"; tail -5 /tmp/loadtest/m21.log || true
               ab-test/devsim/devsim -count "${M21_COUNT}" -dur "${M21_WARMUP_DUR}s" -devices /tmp/loadtest/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
               sleep 15
-              bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor-m2.csv "${M21_DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-go > /tmp/loadtest/monitor-m2.log 2>&1 &
+              bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor-m2.csv "${M21_DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-rs > /tmp/loadtest/monitor-m2.log 2>&1 &
               MON2_PID=$!
               ab-test/devsim/devsim -count "${M21_COUNT}" -dur "${M21_DUR}s" -devices /tmp/loadtest/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log || true
               kill ${MON2_PID} 2>/dev/null || true
