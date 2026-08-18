@@ -11,7 +11,7 @@
 - `.github/workflows/ci-m4-1-userApp-tauri.yml`：M4-1 Tauri App CI。
 - `.github/workflows/ci-m2-1-listener-rs.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query-rs.yml`：M2-2 归档查询层 CI。
-- `.github/workflows/ci-m3-rs.yml`：M3 固件 CI。
+- `.github/workflows/ci-m3-rs.yml`：M3 shared、ROM 和 PC simulator CI。
 - `.gitignore`：发布工程忽略规则。
 
 ## release workflow
@@ -40,7 +40,7 @@
 - `linux_arm64.tar.zst` + `linux_arm64.tar.zst.sha256`
 - `m4-1-userApp-tauri-ios-simulator.app.ipa`
 
-压缩包内布局：5 个服务二进制、`m1-9-ops-panel-ts-<tag>-single`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。不再发布 Docker 镜像与各模块独立压缩包。
+压缩包内布局：5 个服务二进制、`m1-9-ops-panel-ts-<tag>-single`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m3-simulator/`（x86_64 包内的管理服务、fleet、API load 和 profile）、`m4-1/`（apk/aab，仅 arm64 包）。不再发布 Docker 镜像与各模块独立压缩包。
 
 ## 与主仓库的关系
 

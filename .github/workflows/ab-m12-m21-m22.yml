@@ -170,14 +170,13 @@ jobs:
           python3 ab-test/m2-1-m2-2-devices-20k/prep_devices.py
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_devices.sql
 
-      - name: Build loaders
+      - name: Build M3 API load and fleet simulators
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
           nix develop --command bash -c "
-            cd ab-test/m1-2-device-api-rs && GOWORK=off go build -buildvcs=false -o loader .
-            cd ../devsim && GOWORK=off go build -buildvcs=false -o devsim .
+            cargo build --release -p lot-manager-m3-simulator --bin m3-api-load --bin m3-fleet
           "
 
       - name: Start services and run ab test
@@ -215,7 +214,7 @@ jobs:
               echo "--- m1-2 log ---"; tail -5 /tmp/loadtest/m12.log || true
               bash ab-test/m1-2-device-api-rs/monitor.sh /tmp/loadtest/monitor-m12.csv "${M12_DUR}" m1-2-device-api-rs m0-1-center-rs > /tmp/loadtest/monitor-m12.log 2>&1 &
               MON12_PID=$!
-              (cd ab-test/m1-2-device-api-rs && ./loader -mode "${M12_MODE}" -workers "${M12_WORKERS}" -dur "${M12_DUR}s" -base http://127.0.0.1:19312 2>&1 | tee /tmp/loadtest/m12-loader.log) || true
+              ./target/release/m3-api-load --mode "${M12_MODE}" --workers "${M12_WORKERS}" --duration-secs "${M12_DUR}" --base http://127.0.0.1:19312 --devices /tmp/loadtest/m12_devices.jsonl 2>&1 | tee /tmp/loadtest/m12-loader.log
               kill ${MON12_PID} 2>/dev/null || true
               kill ${M12_PID} 2>/dev/null || true
               echo "--- m1-2 log tail ---"; tail -8 /tmp/loadtest/m12.log || true
@@ -230,11 +229,11 @@ jobs:
               M21_PID=$!
               sleep 8
               echo "--- m2-1 log ---"; tail -5 /tmp/loadtest/m21.log || true
-              ab-test/devsim/devsim -count "${M21_COUNT}" -dur "${M21_WARMUP_DUR}s" -devices /tmp/loadtest/devices.jsonl > /tmp/loadtest/warmup.log 2>&1 || true
+              ./target/release/m3-fleet --count "${M21_COUNT}" --duration-secs "${M21_WARMUP_DUR}" --devices /tmp/loadtest/devices.jsonl > /tmp/loadtest/warmup.log 2>&1
               sleep 15
               bash ab-test/m2-1-m2-2-devices-20k/monitor.sh /tmp/loadtest/monitor-m2.csv "${M21_DUR}" m2-1-listener-rs m2-2-archive-query-rs m0-1-center-rs > /tmp/loadtest/monitor-m2.log 2>&1 &
               MON2_PID=$!
-              ab-test/devsim/devsim -count "${M21_COUNT}" -dur "${M21_DUR}s" -devices /tmp/loadtest/devices.jsonl 2>&1 | tee /tmp/loadtest/devsim.log || true
+              ./target/release/m3-fleet --count "${M21_COUNT}" --duration-secs "${M21_DUR}" --devices /tmp/loadtest/devices.jsonl 2>&1 | tee /tmp/loadtest/m3-fleet.log
               kill ${MON2_PID} 2>/dev/null || true
               kill ${M21_PID} ${M22_PID} 2>/dev/null || true
               echo "--- m2-1 log tail ---"; tail -8 /tmp/loadtest/m21.log || true
@@ -251,7 +250,7 @@ jobs:
           path: |
             /tmp/loadtest/m12-loader.log
             /tmp/loadtest/monitor-m12.csv
-            /tmp/loadtest/devsim.log
+            /tmp/loadtest/m3-fleet.log
             /tmp/loadtest/warmup.log
             /tmp/loadtest/monitor-m2.csv
             /tmp/loadtest/m0.log

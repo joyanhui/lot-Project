@@ -55,16 +55,22 @@ jobs:
         shell: bash
         run: cargo metadata --format-version 1 --no-deps
 
-      - name: Check m3-rs
+      - name: Check M3 ROM and simulator
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-device-shared
           env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-firmware
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin lot-manager-m3-simulator
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin m3-fleet
+          env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin m3-api-load
+          env -u CARGO_INCREMENTAL cargo build --release -p lot-manager-m3-simulator --bin m3-fleet --bin m3-api-load
 
-      - name: Run m3-rs host tests
+      - name: Run M3 ROM and shared host tests
         working-directory: workspace
         shell: bash
         run: |
           set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-device-shared
           env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware
