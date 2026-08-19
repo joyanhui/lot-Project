@@ -65,6 +65,7 @@ jobs:
           env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin lot-manager-m3-simulator
           env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin m3-fleet
           env -u CARGO_INCREMENTAL cargo check -p lot-manager-m3-simulator --bin m3-api-load
+          env -u CARGO_INCREMENTAL cargo check -p m1-2-device-api-rs
           env -u CARGO_INCREMENTAL cargo build --release -p lot-manager-m3-simulator --bin m3-fleet --bin m3-api-load
 
       - name: Run M3 ROM and shared host tests
@@ -74,3 +75,4 @@ jobs:
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-device-shared
           env -u CARGO_INCREMENTAL cargo test -p lot-manager-m3-firmware
+          env -u CARGO_INCREMENTAL cargo test -p m1-2-device-api-rs
