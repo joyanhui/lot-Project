@@ -183,11 +183,6 @@ jobs:
         working-directory: workspace
         shell: bash
         env:
-          M0_1_Config_File: ${{ github.workspace }}/workspace/config.lot.v2.json5
-          M1_2_Config_File: ${{ github.workspace }}/workspace/config.lot.v2.json5
-          M2_2_Device_Status_Sync_Cron: "*/60 * * * * *"
-          M2_1_Server_Max_Connections: "32000"
-          M2_1_Root_Key_Sync_Batch_Size: "30000"
           TEST_TARGET: ${{ inputs.test_target }}
           M12_MODE: ${{ inputs.m12_mode }}
           M12_WORKERS: ${{ inputs.m12_workers }}
@@ -198,6 +193,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/loadtest
+          cp config.lot.v2.json5 dist/stage/x86_64/config.lot.v2.json5
+          cp config.lot.v2.json5 target/release/config.lot.v2.json5
           nix develop --command bash -c '
             set -euo pipefail
             trap "pkill -f m0-1-center 2>/dev/null || true; pkill -f m1-2-device-api 2>/dev/null || true; pkill -f m2-2-archive-query 2>/dev/null || true; pkill -f m2-1-listener 2>/dev/null || true" EXIT
