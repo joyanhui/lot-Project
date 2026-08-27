@@ -20,7 +20,6 @@ concurrency:
 
 env:
   SOURCE_REF: ${{ github.event.inputs.source_ref || github.ref_name }}
-  PUBLISH: ${{ github.event.inputs.publish || 'true' }}
   PUBLISH_BRANCH: frontend-pages
 
 jobs:
@@ -70,7 +69,7 @@ jobs:
   publish:
     name: Publish to frontend-pages branch
     needs: build
-    if: ${{ env.PUBLISH == 'true' }}
+    if: ${{ inputs.publish == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact
