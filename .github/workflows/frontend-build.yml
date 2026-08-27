@@ -78,18 +78,6 @@ jobs:
           name: frontend-dist
           path: frontend-dist
 
-      - name: Write wrangler.toml for Cloudflare static assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > frontend-dist/wrangler.toml <<'TOML'
-          name = "lot-manager-aio-frontend"
-          compatibility_date = "2026-08-28"
-          assets = { directory = ".", not_found_handling = "single-page-application" }
-          TOML
-          echo "wrote frontend-dist/wrangler.toml"
-          cat frontend-dist/wrangler.toml
-
       - name: Publish to frontend-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
