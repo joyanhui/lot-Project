@@ -1,0 +1,94 @@
+name: Frontend Build & Publish Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 源码 ref（分支 / tag / commit SHA）
+        required: false
+        default: "main"
+      publish:
+        description: 是否发布到 frontend-pages 分支
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+permissions:
+  contents: write
+
+concurrency:
+  group: frontend-pages-${{ github.event.inputs.source_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_REF: ${{ github.event.inputs.source_ref || github.ref_name }}
+  PUBLISH: ${{ github.event.inputs.publish || 'true' }}
+  PUBLISH_BRANCH: frontend-pages
+
+jobs:
+  build:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout lot-manager-aio
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Resolve source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: workspace/frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOT_SKIP_CHECKER=1 bun run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: workspace/frontend/dist
+          if-no-files-found: error
+
+  publish:
+    name: Publish to frontend-pages branch
+    needs: build
+    if: ${{ env.PUBLISH == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Publish to frontend-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.TOKEN_GH }}
+          external_repository: joyanhui/lot-manager-aio
+          publish_branch: ${{ env.PUBLISH_BRANCH }}
+          publish_dir: frontend-dist
+          commit_message: "frontend-pages: publish from ${{ env.SOURCE_REF }} (${{ github.sha }})"
+          force_orphan: true
