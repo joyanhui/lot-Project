@@ -8,13 +8,9 @@ on:
         required: false
         default: "main"
       publish:
-        description: 是否发布到 frontend-pages 分支
+        description: 是否发布到 frontend-pages 分支（true / false）
         required: false
         default: "true"
-        type: choice
-        options:
-          - "true"
-          - "false"
 permissions:
   contents: write
 
