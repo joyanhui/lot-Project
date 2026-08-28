@@ -1,4 +1,4 @@
-name: CI M1-1 App API Rs
+name: CI M1-1 UserApp API Rs
 
 on:
   workflow_dispatch:
