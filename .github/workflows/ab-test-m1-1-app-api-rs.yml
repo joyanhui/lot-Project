@@ -158,6 +158,10 @@ jobs:
         run: |
           set -euo pipefail
           cp config.lot.v2.json5 target/release/config.lot.v2.json5
+          # release build rejects wildcard CORS; the ab-test client is not a browser,
+          # so pin a concrete origin only in the copied config (repo file untouched).
+          sed -i 's|Cors_Allow_Origin: "\*"|Cors_Allow_Origin: "http://127.0.0.1:19311"|' target/release/config.lot.v2.json5
+          grep -n "Cors_Allow_Origin" target/release/config.lot.v2.json5
           ls -l target/release/config.lot.v2.json5
 
       - name: Start m1-1 and run ab test
