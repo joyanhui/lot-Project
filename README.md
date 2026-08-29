@@ -11,7 +11,6 @@
 - `.github/workflows/ci-m4-1-userApp-tauri.yml`：M4-1 Tauri App CI。
 - `.github/workflows/ci-m2-1-listener-rs.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query-rs.yml`：M2-2 归档查询层 CI。
-- `.github/workflows/ci-m3-rs.yml`：M3 shared、ROM 和 PC simulator CI。
 - `.gitignore`：发布工程忽略规则。
 
 ## release workflow
