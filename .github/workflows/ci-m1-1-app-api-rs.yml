@@ -40,18 +40,23 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install workspace dependencies
         working-directory: workspace
         shell: bash
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build frontend web assets
         working-directory: workspace/frontend
         shell: bash
-        run: bun run build
+        run: pnpm run build
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

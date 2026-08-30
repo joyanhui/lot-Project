@@ -137,10 +137,9 @@ jobs:
         run: |
           set -euo pipefail
           rustup default stable
-          curl -fsSL https://bun.sh/install | bash
-          export PATH="$HOME/.bun/bin:$PATH"
-          bun install --frozen-lockfile
-          (cd frontend && LOT_SKIP_CHECKER=1 bun run build)
+          corepack enable
+          pnpm install --frozen-lockfile
+          (cd frontend && LOT_SKIP_CHECKER=1 pnpm run build)
           rustup target add aarch64-apple-ios-sim
           cargo install tauri-cli --version "^2" --locked || true
           (cd m4-1-userApp-tauri && cargo tauri ios init --ci --skip-targets-install)

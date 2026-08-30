@@ -40,35 +40,40 @@ jobs:
           fi
           git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install workspace dependencies
         working-directory: workspace
         shell: bash
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck shared layer
         working-directory: workspace/lot-shared-lib/TypeScript
         shell: bash
-        run: bun run typecheck
+        run: pnpm run typecheck
 
       - name: Typecheck m1-9-ops-panel-ts
         working-directory: workspace/m1-9-ops-panel-ts
         shell: bash
         run: |
           set -euo pipefail
-          bunx react-router typegen
-          bun run typecheck
+          pnpm exec react-router typegen
+          pnpm run typecheck
 
       - name: Lint m1-9-ops-panel-ts
         working-directory: workspace/m1-9-ops-panel-ts
         shell: bash
-        run: bun run lint
+        run: pnpm run lint
 
       - name: Build m1-9-ops-panel-ts
         working-directory: workspace/m1-9-ops-panel-ts
         shell: bash
         run: |
           set -euo pipefail
-          LOT_SKIP_CHECKER=1 bun run build
+          LOT_SKIP_CHECKER=1 pnpm run build
