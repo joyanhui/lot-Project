@@ -1,4 +1,4 @@
-name: CI M1-2 Ops Console Ts
+name: CI M1-9 Ops Panel Rs
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-9-ops-panel-ts-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m1-9-ops-panel-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -48,32 +48,33 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install workspace dependencies
         working-directory: workspace
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck shared layer
-        working-directory: workspace/lot-shared-lib/TypeScript
-        shell: bash
-        run: pnpm run typecheck
-
-      - name: Typecheck m1-9-ops-panel-ts
-        working-directory: workspace/m1-9-ops-panel-ts
+      - name: Typecheck frontend-ops
+        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec react-router typegen
+          pnpm run openapi:gen
           pnpm run typecheck
 
-      - name: Lint m1-9-ops-panel-ts
-        working-directory: workspace/m1-9-ops-panel-ts
+      - name: Lint frontend-ops
+        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
         shell: bash
         run: pnpm run lint
 
-      - name: Build m1-9-ops-panel-ts
-        working-directory: workspace/m1-9-ops-panel-ts
+      - name: Build frontend-ops
+        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
         shell: bash
-        run: |
-          set -euo pipefail
-          LOT_SKIP_CHECKER=1 pnpm run build
+        run: pnpm run build
+
+      - name: Rust check m1-9-ops-panel-rs
+        working-directory: workspace
+        shell: bash
+        run: cargo check -p m1-9-ops-panel-rs
