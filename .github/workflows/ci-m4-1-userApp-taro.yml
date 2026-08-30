@@ -1,4 +1,4 @@
-name: CI M1-1 UserApp API Rs
+name: CI M4-1 UserApp Taro
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-1-app-api-rs-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m4-1-userApp-taro-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -63,44 +63,12 @@ jobs:
         shell: bash
         run: pnpm run lint
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Restore Rust build cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: lot-rust-host
-          workspaces: |
-            workspace -> target
-
-      - name: Check m1-1-app-api-rs
-        working-directory: workspace
+      - name: Build H5
+        working-directory: workspace/m4-1-userApp-taro
         shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo check -p m1-1-app-api-rs
+        run: pnpm run build:h5
 
-      - name: Run lot-rust-shared tests (incl. json5 config integration)
-        working-directory: workspace
+      - name: Build WeChat mini program
+        working-directory: workspace/m4-1-userApp-taro
         shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared
-
-      - name: Run m1-1-app-api-rs tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m1-1-app-api-rs
-
-      - name: Check generated OpenAPI / error-code artifacts
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
-          git diff --exit-code -- \
-            lot-shared-lib/TypeScript/src/generated/error-codes.ts \
-            m4-1-userApp-taro/openapi-frontend.json \
-            m4-1-userApp-taro/src/generated/openapi.ts
+        run: pnpm run build:weapp
