@@ -55,22 +55,42 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck m4-1-userApp-taro
-        working-directory: workspace/m4-1-userApp-taro
+      - name: Typecheck app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run typecheck
 
-      - name: Lint m4-1-userApp-taro
-        working-directory: workspace/m4-1-userApp-taro
+      - name: Lint app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run lint
 
       - name: Build H5
-        working-directory: workspace/m4-1-userApp-taro
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run build:h5
 
       - name: Build WeChat mini program
-        working-directory: workspace/m4-1-userApp-taro
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run build:weapp
+
+      - name: Typecheck frontend-webapp (WebUI)
+        working-directory: workspace/m4-1-userApp/frontend-webapp
+        shell: bash
+        run: pnpm run typecheck
+
+      - name: Lint frontend-webapp (WebUI)
+        working-directory: workspace/m4-1-userApp/frontend-webapp
+        shell: bash
+        run: pnpm run lint
+
+      - name: Build frontend-webapp + WebUI bundle
+        working-directory: workspace/m4-1-userApp/frontend-webapp
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build
+          pnpm run build:webui-bundle
+          test -f dist/download/webui-manifest.json
+          test -f "dist/download/webui-$(node -p "require('./package.json').version").zip"

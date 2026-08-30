@@ -55,13 +55,13 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck m4-1-userApp-taro
-        working-directory: workspace/m4-1-userApp-taro
+      - name: Typecheck app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run typecheck
 
-      - name: Lint m4-1-userApp-taro
-        working-directory: workspace/m4-1-userApp-taro
+      - name: Lint app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
         shell: bash
         run: pnpm run lint
 
@@ -104,5 +104,5 @@ jobs:
           env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
           git diff --exit-code -- \
             lot-shared-lib/TypeScript/src/generated/error-codes.ts \
-            m4-1-userApp-taro/openapi-frontend.json \
-            m4-1-userApp-taro/src/generated/openapi.ts
+            m4-1-userApp/frontend-webapp/openapi-frontend.json \
+            m4-1-userApp/frontend-webapp/src/generated/openapi.ts
