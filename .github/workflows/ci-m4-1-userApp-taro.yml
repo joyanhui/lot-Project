@@ -91,6 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm run build
-          pnpm run build:webui-bundle
+          GIT_HASH="$(git -C "$GITHUB_WORKSPACE/workspace" rev-parse --short HEAD)"
           test -f dist/download/webui-manifest.json
-          test -f "dist/download/webui-$(node -p "require('./package.json').version").zip"
+          test -f "dist/download/webui-${GIT_HASH}.zip"
+          grep -q "\"git_commit_hash\": \"${GIT_HASH}\"" dist/download/webui-manifest.json

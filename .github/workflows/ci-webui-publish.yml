@@ -1,0 +1,81 @@
+name: CI WebUI Publish to Pages Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "要发布的 lot-manager-aio ref（分支 / tag / commit SHA）"
+        required: false
+        default: "main"
+      target_repo:
+        description: "目标仓库（Pages 分支所在）"
+        required: false
+        default: "joyanhui/lot-Project"
+      branch:
+        description: "目标分支（GitHub Pages source）"
+        required: false
+        default: "dist-webapp"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-webui-publish-${{ github.event.inputs.source_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref || 'main' }}
+      TARGET_REPO: ${{ github.event.inputs.target_repo || 'joyanhui/lot-Project' }}
+      BRANCH: ${{ github.event.inputs.branch || 'dist-webapp' }}
+    steps:
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-manager-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish WebUI to Pages branch via dev.sh
+        working-directory: workspace
+        shell: bash
+        env:
+          GIT_TOKEN: ${{ secrets.TOKEN_GH }}
+          SOURCE_REF: ${{ env.SOURCE_REF }}
+        run: |
+          set -euo pipefail
+          # resolve the full commit for the requested source ref
+          FULL_REF="$(git rev-parse HEAD)"
+          SHORT_REF="${FULL_REF:0:12}"
+          echo "publishing ${FULL_REF} (${SHORT_REF}) -> ${TARGET_REPO}@${BRANCH}"
+          GIT_COMMIT_HASH="${SHORT_REF}" bash script/dev.sh build:webui-publish \
+            "${TARGET_REPO}" "${BRANCH}"
