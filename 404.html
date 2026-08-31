@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IoT Manager</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script>
+      // 首屏防闪烁：配色方案（scheme）缓存优先，兼容旧 zustand 'ui' 存储的主题；彩色 scheme 首帧用系统主题兑底
+      (() => {
+        let theme = null;
+        try {
+          let scheme = localStorage.getItem('lot-ui-scheme');
+          if (!scheme) {
+            const raw = localStorage.getItem('ui');
+            const legacyTheme = raw ? JSON.parse(raw)?.state?.theme : null;
+            scheme = legacyTheme === 'light' ? 'classic-light' : legacyTheme === 'dark' ? 'classic-dark' : 'auto';
+          }
+          if (scheme === 'classic-light') {
+            theme = 'light';
+          } else if (scheme === 'classic-dark') {
+            theme = 'dark';
+          } else {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.classList.add(theme);
+        } catch { /* 解析失败时保持默认浅色 */ }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-Ct1bV4w2.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-CbXtAM7H.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DqPqjJFC.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
