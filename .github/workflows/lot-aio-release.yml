@@ -88,11 +88,25 @@ jobs:
         shell: bash
         run: nix develop --command bash script/dev.sh build:all "${{ matrix.arch }}"
 
+      - name: Set up QEMU for ${{ matrix.arch }} emulation
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build docker image via dev.sh build:dockerimage
+        working-directory: workspace
+        shell: bash
+        run: nix develop --command bash script/dev.sh build:dockerimage "${{ matrix.arch }}"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}-archive
-          path: workspace/dist/${{ matrix.output }}*
+          path: |
+            workspace/dist/${{ matrix.output }}*
+            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz*
           if-no-files-found: error
 
       - name: Upload to private release
@@ -105,7 +119,9 @@ jobs:
           bash workspace/.github/script/gh-release.sh upload \
             "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
             workspace/dist/${{ matrix.output }} \
-            workspace/dist/${{ matrix.output }}.sha256
+            workspace/dist/${{ matrix.output }}.sha256 \
+            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz \
+            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz.sha256
 
   build-ios:
     name: Build iOS simulator .app.ipa

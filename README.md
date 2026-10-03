@@ -31,15 +31,18 @@
 
 - x86_64 job：`bash script/dev.sh build:all`，Rust 服务端 native glibc 构建（CI 用 runner 系统 gcc，兼容 Debian），产出 `dist/linux_x86.tar.zst`。
 - arm64 job：`bash script/dev.sh build:all arm64`，Rust 服务端经 `cargo-zigbuild`（zig）交叉编译为静态 musl 二进制，产出 `dist/linux_arm64.tar.zst`。
+- 两个 linux job 在 `build:all` 之后继续构建 Docker 镜像：arm64 先 `docker/setup-qemu-action`，统一 `docker/setup-buildx-action`，再用 `nix develop` 调用 `bash script/dev.sh build:dockerimage <arch>`（镜像内二进制为 musl 静态，基础镜像 `debian:trixie-slim`）。
 - iOS job（macos）：构建无签名 iOS Simulator `.app`，压缩为 `.app.ipa`（zip 格式，非真机可安装 IPA）。
 
 ## 发布资产
 
 - `linux_x86.tar.zst` + `linux_x86.tar.zst.sha256`
 - `linux_arm64.tar.zst` + `linux_arm64.tar.zst.sha256`
+- `lot-manager-aio-x86_64-docker.tar.gz` + `.sha256`
+- `lot-manager-aio-arm64-docker.tar.gz` + `.sha256`
 - `m4-1-userApp-tauri-ios-simulator.app.ipa`
 
-压缩包内布局：5 个服务二进制、`m1-9-ops-panel-ts-<tag>-single`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m3-simulator/`（x86_64 包内的管理服务、fleet、API load 和 profile）等待新版模拟器实现恢复打包。不再发布 Docker 镜像与各模块独立压缩包。
+压缩包内布局：5 个服务二进制、`m1-9-ops-panel-rs-single` 与 `m1-9-ops-panel-rs/frontend-ops/dist`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m3-simulator/`（x86_64 包内的管理服务、fleet、API load 和 profile）等待新版模拟器实现恢复打包。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包。
 
 ## 与主仓库的关系
 
