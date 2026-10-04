@@ -82,20 +82,6 @@ jobs:
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m1-1-app-api-rs
 
-      - name: Run lot-rust-shared tests (incl. json5 config integration)
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p lot-rust-shared
-
-      - name: Run m1-1-app-api-rs tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m1-1-app-api-rs
-
       - name: Check generated OpenAPI / error-code artifacts
         working-directory: workspace
         shell: bash

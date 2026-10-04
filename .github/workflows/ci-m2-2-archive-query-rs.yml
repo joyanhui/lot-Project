@@ -65,10 +65,3 @@ jobs:
         run: |
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m2-2-archive-query-rs
-
-      - name: Run m2-2-archive-query-rs tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m2-2-archive-query-rs

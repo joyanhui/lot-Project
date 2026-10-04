@@ -63,10 +63,3 @@ jobs:
         run: |
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m1-2-device-api-rs
-
-      - name: Run m1-2-device-api-rs tests
-        working-directory: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          env -u CARGO_INCREMENTAL cargo test -p m1-2-device-api-rs

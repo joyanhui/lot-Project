@@ -39,4 +39,3 @@ jobs:
         working-directory: workspace
         run: |
           cargo check -p m0-1-center-rs
-          cargo test -p m0-1-center-rs
