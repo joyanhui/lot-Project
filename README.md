@@ -55,7 +55,7 @@
 手动触发 release：在仓库根目录执行 `release-tag` 命令，创建并推送 tag 即可通过 `.github/workflows/trigger-lot-project-release.yml` 自动调度 release workflow。
 
 ```bash
-bash script/dev.sh release-tag:create <tag>
+bash script/dev.sh release:tag <tag>
 ```
 
 任意 `v*` 前缀 tag（含模块前缀如 `m1-1-app-api-rs-v*`）统一触发 `build:all`，发布全部资产。
