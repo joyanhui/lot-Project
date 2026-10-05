@@ -42,7 +42,7 @@
 - `lot-manager-aio-arm64-docker.tar.gz` + `.sha256`
 - `m4-1-userApp-tauri-ios-simulator.app.ipa`
 
-压缩包内布局：5 个服务二进制、`m1-9-ops-panel-rs-single` 与 `m1-9-ops-panel-rs/frontend-ops/dist`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m3-simulator/`（x86_64 包内的管理服务、fleet、API load 和 profile）等待新版模拟器实现恢复打包。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包。
+压缩包内布局：5 个服务二进制、`m1-9-ops-panel-rs-single` 与 `m1-9-ops-panel-rs/frontend-ops/dist`、`dev-gui-manager-ts-<tag>-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m-simulators` 模拟器（`m-sim`）为开发工具，不随部署包发布，本地构建与使用见根 README 与 `m-simulators/README.md`。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包。
 
 ## 与主仓库的关系
 
