@@ -75,18 +75,18 @@ jobs:
         shell: bash
         run: pnpm run build:weapp
 
-      - name: Typecheck frontend-webapp (WebUI)
-        working-directory: workspace/m4-1-userApp/frontend-webapp
+      - name: Typecheck web-ui
+        working-directory: workspace/frontend/web-ui
         shell: bash
         run: pnpm run typecheck
 
-      - name: Lint frontend-webapp (WebUI)
-        working-directory: workspace/m4-1-userApp/frontend-webapp
+      - name: Lint web-ui
+        working-directory: workspace/frontend/web-ui
         shell: bash
         run: pnpm run lint
 
-      - name: Build frontend-webapp + WebUI bundle
-        working-directory: workspace/m4-1-userApp/frontend-webapp
+      - name: Build web-ui + WebUI bundle
+        working-directory: workspace/frontend/web-ui
         shell: bash
         run: |
           set -euo pipefail

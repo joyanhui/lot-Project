@@ -58,21 +58,21 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck frontend-ops
-        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
+      - name: Typecheck ops-ui
+        working-directory: workspace/frontend/ops-ui
         shell: bash
         run: |
           set -euo pipefail
           pnpm run openapi:gen
           pnpm run typecheck
 
-      - name: Lint frontend-ops
-        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
+      - name: Lint ops-ui
+        working-directory: workspace/frontend/ops-ui
         shell: bash
         run: pnpm run lint
 
-      - name: Build frontend-ops
-        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
+      - name: Build ops-ui
+        working-directory: workspace/frontend/ops-ui
         shell: bash
         run: pnpm run build
 

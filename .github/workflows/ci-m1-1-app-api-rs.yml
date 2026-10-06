@@ -90,5 +90,5 @@ jobs:
           env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
           git diff --exit-code -- \
             lot-shared-lib/TypeScript/src/generated/error-codes.ts \
-            m4-1-userApp/frontend-webapp/openapi-frontend.json \
-            m4-1-userApp/frontend-webapp/src/generated/openapi.ts
+            frontend/web-ui/openapi-frontend.json \
+            frontend/web-ui/src/generated/openapi.ts
