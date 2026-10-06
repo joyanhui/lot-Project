@@ -1,4 +1,4 @@
-name: CI M1-9 Ops Panel Rs
+name: CI M0-1 Center and Ops Rs
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-m1-9-ops-panel-rs-${{ github.event.inputs.source_ref || github.run_id }}
+  group: ci-m0-1-center-and-ops-rs-${{ github.event.inputs.source_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck frontend-ops
-        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
+        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
         shell: bash
         run: |
           set -euo pipefail
@@ -67,16 +67,16 @@ jobs:
           pnpm run typecheck
 
       - name: Lint frontend-ops
-        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
+        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
         shell: bash
         run: pnpm run lint
 
       - name: Build frontend-ops
-        working-directory: workspace/m1-9-ops-panel-rs/frontend-ops
+        working-directory: workspace/m0-1-center-and-ops-rs/frontend-ops
         shell: bash
         run: pnpm run build
 
-      - name: Rust check m1-9-ops-panel-rs
+      - name: Rust check m0-1-center-and-ops-rs
         working-directory: workspace
         shell: bash
-        run: cargo check -p m1-9-ops-panel-rs
+        run: cargo check -p m0-1-center-and-ops-rs
