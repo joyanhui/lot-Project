@@ -41,7 +41,7 @@
 - `m4-1-userApp-tauri-ios-simulator.app.ipa`
 - 私有 Docker 镜像：`ghcr.io/joyanhui/lot-manager-aio`（`<release_tag>-amd64`/`-arm64` 单平台 tag，`<release_tag>` 多平台清单；仅正式版本 `^v[0-9]+\.[0-9]+\.[0-9]+$` 附加 `latest`；可见性 private）
 
-压缩包内布局：5 个服务二进制、`m1-9-ops-panel-rs-single` 与 `m1-9-ops-panel-rs/frontend-ops/dist`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m-simulators` 模拟器（`m-sim`）为开发工具，不随部署包发布，本地构建与使用见根 README 与 `m-simulators/README.md`。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包，也不再把镜像包作为 release 资产上传。
+压缩包内布局：5 个服务二进制、`m1-9-ops-panel-rs-single` 与 `m1-9-ops-panel-rs/frontend-ops/dist`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。`m3-device/simulator-rs` 模拟器（`m-sim`）为开发工具，不随部署包发布，本地构建与使用见根 README 与 `m3-device/simulator-rs/README.md`。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包，也不再把镜像包作为 release 资产上传。
 
 ## 与主仓库的关系
 
