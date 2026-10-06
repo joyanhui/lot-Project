@@ -33,7 +33,6 @@ env:
   PUBLISH_RELEASE: ${{ inputs.publish_release }}
   RELEASE_TAG: ${{ inputs.release_tag }}
   SOURCE_REF: ${{ inputs.source_ref }}
-  IMAGE_REPO: ghcr.io/joyanhui/lot-manager-aio
 
 jobs:
   prepare-private-release:
@@ -67,7 +66,6 @@ jobs:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       LOT_IMAGE_PUSH: "1"
       LOT_IMAGE_TAG: ${{ inputs.release_tag }}
-      LOT_IMAGE_REPOSITORY: ${{ env.IMAGE_REPO }}
       LOT_IMAGE_USER: ${{ github.repository_owner }}
     steps:
       - name: Checkout lot-manager-aio
@@ -105,7 +103,9 @@ jobs:
       - name: Build and push docker image via dev.sh build:dockerimage
         working-directory: workspace
         shell: bash
-        run: nix develop --command bash script/dev.sh build:dockerimage "${{ matrix.arch }}"
+        run: |
+          export LOT_IMAGE_REPOSITORY="ghcr.io/${GITHUB_REPOSITORY_OWNER}/lot-manager-aio"
+          nix develop --command bash script/dev.sh build:dockerimage "${{ matrix.arch }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -133,8 +133,7 @@ jobs:
     env:
       TOKEN_GH: ${{ secrets.TOKEN_GH }}
       GH_TOKEN: ${{ secrets.TOKEN_GH }}
-      IMAGE_REPO: ${{ env.IMAGE_REPO }}
-      RELEASE_TAG: ${{ env.RELEASE_TAG }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
     steps:
       - name: Login to GHCR
         shell: bash
@@ -146,11 +145,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tags=(-t "${IMAGE_REPO}:${RELEASE_TAG}")
+          image_repo="ghcr.io/${GITHUB_REPOSITORY_OWNER}/lot-manager-aio"
+          tags=(-t "${image_repo}:${RELEASE_TAG}")
           if [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            tags+=(-t "${IMAGE_REPO}:latest")
+            tags+=(-t "${image_repo}:latest")
           fi
-          docker buildx imagetools create "${tags[@]}" "${IMAGE_REPO}:${RELEASE_TAG}-amd64" "${IMAGE_REPO}:${RELEASE_TAG}-arm64"
+          docker buildx imagetools create "${tags[@]}" "${image_repo}:${RELEASE_TAG}-amd64" "${image_repo}:${RELEASE_TAG}-arm64"
 
       - name: Set package visibility to private
         shell: bash
