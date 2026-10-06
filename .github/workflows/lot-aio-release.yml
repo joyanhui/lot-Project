@@ -33,6 +33,7 @@ env:
   PUBLISH_RELEASE: ${{ inputs.publish_release }}
   RELEASE_TAG: ${{ inputs.release_tag }}
   SOURCE_REF: ${{ inputs.source_ref }}
+  IMAGE_REPO: ghcr.io/joyanhui/lot-manager-aio
 
 jobs:
   prepare-private-release:
@@ -62,6 +63,12 @@ jobs:
             output: linux_x86.tar.zst
           - arch: arm64
             output: linux_arm64.tar.zst
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      LOT_IMAGE_PUSH: "1"
+      LOT_IMAGE_TAG: ${{ inputs.release_tag }}
+      LOT_IMAGE_REPOSITORY: ${{ env.IMAGE_REPO }}
+      LOT_IMAGE_USER: ${{ github.repository_owner }}
     steps:
       - name: Checkout lot-manager-aio
         uses: actions/checkout@v4
@@ -95,7 +102,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build docker image via dev.sh build:dockerimage
+      - name: Build and push docker image via dev.sh build:dockerimage
         working-directory: workspace
         shell: bash
         run: nix develop --command bash script/dev.sh build:dockerimage "${{ matrix.arch }}"
@@ -104,9 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}-archive
-          path: |
-            workspace/dist/${{ matrix.output }}*
-            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz*
+          path: workspace/dist/${{ matrix.output }}*
           if-no-files-found: error
 
       - name: Upload to private release
@@ -119,9 +124,42 @@ jobs:
           bash workspace/.github/script/gh-release.sh upload \
             "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
             workspace/dist/${{ matrix.output }} \
-            workspace/dist/${{ matrix.output }}.sha256 \
-            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz \
-            workspace/dist/lot-manager-aio-${{ matrix.arch }}-docker.tar.gz.sha256
+            workspace/dist/${{ matrix.output }}.sha256
+
+  merge-image:
+    name: Merge multiarch image and set private visibility
+    needs: build-linux
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GH_TOKEN: ${{ secrets.TOKEN_GH }}
+      IMAGE_REPO: ${{ env.IMAGE_REPO }}
+      RELEASE_TAG: ${{ env.RELEASE_TAG }}
+    steps:
+      - name: Login to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${TOKEN_GH}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+      - name: Merge multiarch manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          tags=(-t "${IMAGE_REPO}:${RELEASE_TAG}")
+          if [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags+=(-t "${IMAGE_REPO}:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" "${IMAGE_REPO}:${RELEASE_TAG}-amd64" "${IMAGE_REPO}:${RELEASE_TAG}-arm64"
+
+      - name: Set package visibility to private
+        shell: bash
+        run: |
+          set -euo pipefail
+          vis="$(gh api /user/packages/container/lot-manager-aio --jq .visibility)"
+          if [[ "${vis}" != "private" ]]; then
+            gh api -X PATCH /user/packages/container/lot-manager-aio -f visibility=private
+          fi
 
   build-ios:
     name: Build iOS simulator .app.ipa
