@@ -8,7 +8,7 @@
 - `.github/workflows/ci-m1-1-app-api-rs.yml`：M1-1 控制面 CI。
 - `.github/workflows/ci-m1-2-device-api-rs.yml`：M1-2 设备面 CI。
 - `.github/workflows/ci-m0-1-center-and-ops-rs.yml`：M0-1 运行态中心与运维控制台 CI（Rust + `frontend/ops-ui` 前端校验）。
-- `.github/workflows/ci-m4-1-userApp-tauri.yml`：M4-1 Tauri App CI。
+- `.github/workflows/ci-m4-1-userApp-taro.yml`：M4-1 客户端 CI（weapp/h5/rn 校验）。
 - `.github/workflows/ci-m2-1-listener-rs.yml`：M2-1 接入层 CI。
 - `.github/workflows/ci-m2-2-archive-query-rs.yml`：M2-2 归档查询层 CI。
 - `.gitignore`：发布工程忽略规则。
@@ -38,7 +38,7 @@
 
 - `linux_x86.tar.zst` + `linux_x86.tar.zst.sha256`
 - `linux_arm64.tar.zst` + `linux_arm64.tar.zst.sha256`
-- `m4-1-userApp-tauri-ios-simulator.app.ipa`
+- `lotManager-userapp-ios-simulator.app.ipa`
 - 私有 Docker 镜像：`ghcr.io/joyanhui/lot-manager-aio`（`<release_tag>-amd64`/`-arm64` 单平台 tag，`<release_tag>` 多平台清单；仅正式版本 `^v[0-9]+\.[0-9]+\.[0-9]+$` 附加 `latest`；可见性 private）
 
 压缩包内布局：服务二进制与 `m0-1-center-and-ops-rs-single`、`frontend_dist/`、`config.lot.v2.json5`、`m3/`（固件与分区文件）、`m4-1/`（apk/aab，仅 arm64 包）。运维前端 `frontend/ops-ui` 独立部署，不随压缩包发布。`m3-device/simulator-rs` 模拟器（`m-sim`）为开发工具，不随部署包发布，本地构建与使用见根 README 与 `m3-device/simulator-rs/README.md`。Docker 镜像为独立资产（一个镜像含全部服务，用 `SERVICE_ROLE` 选择服务，详见 `script/README.md`），不再发布各模块独立压缩包，也不再把镜像包作为 release 资产上传。

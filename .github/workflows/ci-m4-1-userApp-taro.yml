@@ -75,6 +75,11 @@ jobs:
         shell: bash
         run: pnpm run build:weapp
 
+      - name: Build React Native bundle
+        working-directory: workspace/m4-1-userApp/app-taro
+        shell: bash
+        run: pnpm run build:rn
+
       - name: Typecheck web-ui
         working-directory: workspace/frontend/web-ui
         shell: bash
