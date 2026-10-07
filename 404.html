@@ -14,16 +14,14 @@ body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify
 (function () {
   var known = ["ops-ui", "web-ui"];
   var segs = (location.pathname || "/").split("/").filter(Boolean);
-  var root = "";
   for (var i = 0; i < segs.length; i++) {
-    if (known.indexOf(segs[i]) !== -1) { root = "/" + segs.slice(0, i + 1).join("/"); break; }
+    if (known.indexOf(segs[i]) !== -1) {
+      location.replace("/" + segs.slice(0, i + 1).join("/") + "/");
+      return;
+    }
   }
-  if (!root) {
-    document.title = "Page not found";
-    document.body.innerHTML = '<div style="font-family:system-ui;text-align:center;padding:3rem"><h1>404</h1><p>页面不存在或已移动。</p></div>';
-    return;
-  }
-  location.replace(root + "/?spa_path=" + encodeURIComponent(location.pathname));
+  document.title = "Page not found";
+  document.body.innerHTML = '<div style="font-family:system-ui;text-align:center;padding:3rem"><h1>404</h1><p>页面不存在或已移动。</p></div>';
 })();
 </script>
 </body>

@@ -1,7 +1,7 @@
 {
-  "git_commit_hash": "503613bd0a68",
-  "bundle_url": "./download/webui-503613bd0a68.zip",
-  "sha256": "8f43395b4ac960d4459b0e9234aa57c52c4e084aade752e317872662c8594f53",
-  "size": 255542,
+  "git_commit_hash": "5a1f202c1649",
+  "bundle_url": "./download/webui-5a1f202c1649.zip",
+  "sha256": "026c7d879f6bc1932c7455882c703d7b9e9ca704af49290336f6b8060f0bbee9",
+  "size": 255577,
   "min_bridge_version": 1
 }
