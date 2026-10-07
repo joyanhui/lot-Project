@@ -4,6 +4,6 @@ GitHub Pages 源分支，由 script/dev_bash/build-frontend-publish.sh 生成并
 
 - CNAME：自定义域名（lot-frontend-b.leiyanhui.com）
 - robots.txt：根目录及 ops-ui/、web-ui/ 子目录各一份（禁止收录）
-- 404.html：SPA 兜底重定向页（自动定位部署根）
+- 404.html：SPA 兜底加载页（保留路径，自动加载对应部署根部）
 - ops-ui/：运维控制台 SPA
 - web-ui/：业务 WebUI SPA（含 download/ 与 robots.txt）

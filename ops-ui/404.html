@@ -2,21 +2,46 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Redirecting</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>页面加载中</title>
+<style>
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f4f6f8; color: #73808a; font: 14px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div>页面加载中…</div>
 <script>
 (function () {
-  var known = ["ops-ui"];
+  var known = ["ops-ui", "web-ui"];
   var segs = (location.pathname || "/").split("/").filter(Boolean);
+  var root = "";
   for (var i = 0; i < segs.length; i++) {
-    if (known.indexOf(segs[i]) !== -1) {
-      location.replace("/" + segs.slice(0, i + 1).join("/") + "/");
-      return;
-    }
+    if (known.indexOf(segs[i]) !== -1) { root = "/" + segs.slice(0, i + 1).join("/"); break; }
   }
-  document.title = "Page not found";
-  document.body.innerHTML = '<div style="font-family:system-ui;text-align:center;padding:3rem"><h1>404</h1><p>页面不存在或已移动。</p></div>';
+  if (!root) {
+    document.title = "Page not found";
+    document.body.innerHTML = '<div style="font-family:system-ui;text-align:center;padding:3rem"><h1>404</h1><p>页面不存在或已移动。</p></div>';
+    return;
+  }
+  fetch(root + "/index.html")
+    .then(function (res) { if (!res.ok) throw new Error(String(res.status)); return res.text(); })
+    .then(function (html) {
+      html = html.replace(/<head([^>]*)>/i, '<head$1><base href="' + root + '/">');
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var base = document.createElement("base");
+      base.href = root + "/";
+      var head = document.head;
+      while (head.firstChild) head.removeChild(head.firstChild);
+      head.appendChild(base);
+      var headNodes = Array.prototype.slice.call(doc.head.childNodes);
+      for (var i = 0; i < headNodes.length; i++) head.appendChild(headNodes[i]);
+      var body = document.body;
+      while (body.firstChild) body.removeChild(body.firstChild);
+      var bodyNodes = Array.prototype.slice.call(doc.body.childNodes);
+      for (var j = 0; j < bodyNodes.length; j++) body.appendChild(bodyNodes[j]);
+    })
+    .catch(function () { location.replace(root + "/"); });
 })();
 </script>
-</head>
-<body></body>
+</body>
 </html>
