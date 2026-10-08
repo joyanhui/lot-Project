@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      - name: Publish frontends to Pages branch via dev.sh
+      - name: Publish frontends to Pages branch via dev.py
         working-directory: workspace
         shell: bash
         env:
@@ -77,5 +77,5 @@ jobs:
           FULL_REF="$(git rev-parse HEAD)"
           SHORT_REF="${FULL_REF:0:12}"
           echo "publishing ${FULL_REF} (${SHORT_REF}) -> ${TARGET_REPO}@${BRANCH}"
-          GIT_COMMIT_HASH="${SHORT_REF}" bash script/dev.sh build:frontend-publish \
+          GIT_COMMIT_HASH="${SHORT_REF}" script/dev.py build:frontend-publish \
             "${TARGET_REPO}" "${BRANCH}"

@@ -112,10 +112,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Build m1-1 via dev.sh
+      - name: Build m1-1 via dev.py
         working-directory: workspace
         shell: bash
-        run: nix develop --command bash script/dev.sh build:m1-1-app-api-rs x86_64
+        run: nix develop --command script/dev.py build:m1-1-app-api-rs x86_64
 
       - name: Build loader
         working-directory: workspace/ab-test/m1-1-app-api-rs/online-20k
