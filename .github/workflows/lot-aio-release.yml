@@ -189,7 +189,7 @@ jobs:
       - name: Set up Node + pnpm
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Enable pnpm
         run: corepack enable
 
@@ -201,6 +201,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install dependencies
         working-directory: workspace
@@ -265,7 +267,7 @@ jobs:
       - name: Set up Node + pnpm
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Enable pnpm
         run: corepack enable
 
