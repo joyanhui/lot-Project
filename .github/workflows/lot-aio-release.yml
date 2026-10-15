@@ -1,0 +1,305 @@
+name: lot-AIO-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 是否发布到 release
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      release_tag:
+        description: 发布 tag（如 v0.1.0）
+        default: "v0.1.0"
+        required: true
+        type: string
+      source_ref:
+        description: 源码 ref（如 v0.1.0 或 main）
+        required: true
+        default: "main"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.release_tag }}
+  cancel-in-progress: true
+
+env:
+  PRIVATE_RELEASE_REPO: joyanhui/lot-aio
+  PUBLISH_RELEASE: ${{ inputs.publish_release }}
+  RELEASE_TAG: ${{ inputs.release_tag }}
+  SOURCE_REF: ${{ inputs.source_ref }}
+
+jobs:
+  prepare-private-release:
+    name: Prepare private release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release if missing
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          gh release view "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1 ||
+            gh release create "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" --title "${RELEASE_TAG}" --notes "" ||
+            gh release view "${RELEASE_TAG}" -R "${PRIVATE_RELEASE_REPO}" >/dev/null 2>&1
+
+  build-linux:
+    name: Build linux ${{ matrix.arch }}
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            output: linux_x86.tar.zst
+          - arch: arm64
+            output: linux_arm64.tar.zst
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      LOT_IMAGE_PUSH: "1"
+      LOT_IMAGE_TAG: ${{ inputs.release_tag }}
+      LOT_IMAGE_USER: ${{ github.repository_owner }}
+    steps:
+      - name: Checkout lot-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Build via dev.py build:all
+        working-directory: workspace
+        shell: bash
+        run: nix develop --command script/dev.py build:all "${{ matrix.arch }}"
+
+      - name: Set up QEMU for ${{ matrix.arch }} emulation
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push docker image via dev.py build:dockerimage
+        working-directory: workspace
+        shell: bash
+        run: |
+          export LOT_IMAGE_REPOSITORY="ghcr.io/${GITHUB_REPOSITORY_OWNER}/lot-aio"
+          nix develop --command script/dev.py build:dockerimage "${{ matrix.arch }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}-archive
+          path: workspace/dist/${{ matrix.output }}*
+          if-no-files-found: error
+
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          bash workspace/.github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
+            workspace/dist/${{ matrix.output }} \
+            workspace/dist/${{ matrix.output }}.sha256
+
+  merge-image:
+    name: Merge multiarch image and set private visibility
+    needs: build-linux
+    runs-on: ubuntu-latest
+    env:
+      TOKEN_GH: ${{ secrets.TOKEN_GH }}
+      GH_TOKEN: ${{ secrets.TOKEN_GH }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Login to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${TOKEN_GH}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+
+      - name: Merge multiarch manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_repo="ghcr.io/${GITHUB_REPOSITORY_OWNER}/lot-aio"
+          tags=(-t "${image_repo}:${RELEASE_TAG}")
+          if [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags+=(-t "${image_repo}:latest")
+          fi
+          docker buildx imagetools create "${tags[@]}" "${image_repo}:${RELEASE_TAG}-amd64" "${image_repo}:${RELEASE_TAG}-arm64"
+
+      - name: Set package visibility to private
+        shell: bash
+        run: |
+          set -euo pipefail
+          vis="$(gh api /user/packages/container/lot-aio --jq .visibility)"
+          if [[ "${vis}" != "private" ]]; then
+            gh api -X PATCH /user/packages/container/lot-aio -f visibility=private
+          fi
+
+  build-android:
+    name: Build RN Android apk/aab
+    needs: prepare-private-release
+    runs-on: ubuntu-latest
+    env:
+      OUTPUT_NAME: lotManager-userapp-android
+      RN_ARCHES: arm64-v8a
+    steps:
+      - name: Checkout lot-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Set up Node + pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      - name: Build RN Android apk/aab
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash script/dev_bash/build/build-rn.sh android
+          mkdir -p /tmp/release
+          cp $(find m4-1-userApp/app-taro/android/app/build/outputs -type f \( -name '*.apk' -o -name '*.aab' \) | head -2) /tmp/release/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUTPUT_NAME }}
+          path: |
+            /tmp/release/*.apk
+            /tmp/release/*.aab
+          if-no-files-found: error
+
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          for f in /tmp/release/*.apk /tmp/release/*.aab; do
+            bash workspace/.github/script/gh-release.sh upload \
+              "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" "$f"
+          done
+
+  build-ios:
+    name: Build RN iOS simulator .app.ipa
+    needs: prepare-private-release
+    runs-on: macos-latest
+    env:
+      OUTPUT_NAME: lotManager-userapp-ios-simulator.app.ipa
+    steps:
+      - name: Checkout lot-aio
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_RELEASE_REPO }}
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch to requested source ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Set up Node + pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      - name: Build RN iOS simulator app and package ipa
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash script/dev_bash/build/build-rn.sh ios
+          app_path="$(find m4-1-userApp/app-taro/ios/build/DerivedData -type d -name '*.app' | head -1)"
+          test -n "${app_path}"
+          mkdir -p /tmp/release
+          ditto -c -k --keepParent "${app_path}" "/tmp/release/${OUTPUT_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: m4-1-userapp-ios
+          path: /tmp/release/${{ env.OUTPUT_NAME }}
+          if-no-files-found: error
+
+      - name: Upload to private release
+        if: ${{ env.PUBLISH_RELEASE == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN_GH }}
+        run: |
+          set -euo pipefail
+          bash workspace/.github/script/gh-release.sh upload \
+            "${RELEASE_TAG}" "${PRIVATE_RELEASE_REPO}" \
+            /tmp/release/${{ env.OUTPUT_NAME }}

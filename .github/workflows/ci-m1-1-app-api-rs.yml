@@ -1,0 +1,94 @@
+name: CI M1-1 UserApp API Rs
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "要校验的 lot-aio ref（分支 / tag / commit SHA）"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-m1-1-app-api-rs-${{ github.event.inputs.source_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REF: ${{ github.event.inputs.source_ref }}
+    steps:
+      - name: Checkout private workspace
+        uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
+
+      - name: Switch private workspace to requested ref
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git rev-parse --verify --quiet "${SOURCE_REF}^{commit}" >/dev/null; then
+            git fetch origin "${SOURCE_REF}" --tags --force || git fetch origin --tags --force
+          fi
+          git checkout --detach "${SOURCE_REF}" || git checkout --detach "origin/${SOURCE_REF}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Install workspace dependencies
+        working-directory: workspace
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
+        shell: bash
+        run: pnpm run typecheck
+
+      - name: Lint app-taro (native shell)
+        working-directory: workspace/m4-1-userApp/app-taro
+        shell: bash
+        run: pnpm run lint
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lot-rust-host
+          workspaces: |
+            workspace -> target
+
+      - name: Check m1-1-app-api-rs
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo check -p m1-1-app-api-rs
+
+      - name: Check generated OpenAPI / error-code artifacts
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -u CARGO_INCREMENTAL cargo run -p m1-1-app-api-rs -- --sync-frontend
+          git diff --exit-code -- \
+            lot-shared-lib/TypeScript/src/generated/error-codes.ts \
+            frontend/web-ui/openapi-frontend.json \
+            frontend/web-ui/src/generated/openapi.ts
