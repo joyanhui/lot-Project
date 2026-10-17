@@ -25,6 +25,8 @@
 
 私有仓库拉取凭据：GitHub Actions secret `TOKEN_GH`。
 
+发布防回归约束：RN Babel 插件必须在 app-taro 的 devDependencies 显式声明；Android Gradle 保留可用 Maven 仓库；APK/AAB 上传使用 nullglob，禁止未匹配 glob 作为字面路径；新 release 通过后及时取消旧任务。
+
 构建环境统一复用私有仓库的 `flake.nix` / `flake_pkgs_let.nix` / `flake.lock`（`cachix/install-nix-action` + `nix develop`），不在 runner 上手写依赖；仅 iOS job 因 macOS 无法使用 linux flake 而保留原生步骤。
 
 ## 构建方式
