@@ -79,4 +79,11 @@ jobs:
       - name: Rust check m0-1-center-and-ops-rs
         working-directory: workspace
         shell: bash
-        run: cargo check -p m0-1-center-and-ops-rs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/lot-cfg
+          cp cfg.lot.v3.lua /tmp/lot-cfg/cfg.lot.v3.lua
+          export LOT_CFG_DIR=/tmp/lot-cfg
+          cargo check -p m0-1-center-and-ops-rs
+          cargo build -p m0-1-center-and-ops-rs
+          ./target/debug/m0-1-center-and-ops-rs --config-check

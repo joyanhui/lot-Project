@@ -81,6 +81,11 @@ jobs:
         run: |
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m1-1-app-api-rs
+          mkdir -p /tmp/lot-cfg
+          cp cfg.lot.v3.lua /tmp/lot-cfg/cfg.lot.v3.lua
+          export LOT_CFG_DIR=/tmp/lot-cfg
+          cargo build -p m1-1-app-api-rs
+          ./target/debug/m1-1-app-api-rs --config-check
 
       - name: Check generated OpenAPI / error-code artifacts
         working-directory: workspace

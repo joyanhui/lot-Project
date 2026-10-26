@@ -18,6 +18,8 @@ jobs:
           CF_AIO_API_KEY: ${{ secrets.CF_AIO_API_KEY }}
           M3_SIGNING_PUBLIC_KEY_SHA256: ${{ vars.M3_SIGNING_PUBLIC_KEY_SHA256 }}
           M3_DEVICE_CERT_SHA256: ${{ vars.M3_DEVICE_CERT_SHA256 }}
+          M3_SIGNING_KEY_IDENTIFIER: ${{ vars.M3_SIGNING_KEY_IDENTIFIER }}
+          M3_DEVICE_CERT_IDENTIFIER: ${{ vars.M3_DEVICE_CERT_IDENTIFIER }}
         run: python3 script/sync_m3_trust_material.py
       - name: Verify generated files
         run: |

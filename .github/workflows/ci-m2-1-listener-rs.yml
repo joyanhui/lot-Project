@@ -61,3 +61,8 @@ jobs:
         run: |
           set -euo pipefail
           env -u CARGO_INCREMENTAL cargo check -p m2-1-listener-rs
+          mkdir -p /tmp/lot-cfg
+          cp cfg.lot.v3.lua /tmp/lot-cfg/cfg.lot.v3.lua
+          export LOT_CFG_DIR=/tmp/lot-cfg
+          cargo build -p m2-1-listener-rs
+          ./target/debug/m2-1-listener-rs --config-check
