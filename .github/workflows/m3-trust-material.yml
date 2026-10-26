@@ -1,0 +1,25 @@
+name: M3 trust material
+
+on:
+  workflow_call:
+
+jobs:
+  sync-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install certificate tooling
+        run: sudo apt-get update && sudo apt-get install -y openssl
+      - name: Fetch pinned device trust material
+        env:
+          CF_AIO_API_KEY: ${{ secrets.CF_AIO_API_KEY }}
+          M3_SIGNING_PUBLIC_KEY_SHA256: ${{ vars.M3_SIGNING_PUBLIC_KEY_SHA256 }}
+          M3_DEVICE_CERT_SHA256: ${{ vars.M3_DEVICE_CERT_SHA256 }}
+        run: python3 script/sync_m3_trust_material.py
+      - name: Verify generated files
+        run: |
+          test "$(wc -c < m3-device/m3-1-rom-mpy/ed25519.pub)" -eq 65
+          test "$(wc -c < m3-device/m3-1-rom-mpy/device-cert.sha256)" -eq 65
