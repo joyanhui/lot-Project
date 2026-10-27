@@ -2,18 +2,23 @@ name: M3 trust material
 
 on:
   workflow_call:
-  pull_request:
-    paths:
-      - 'm3-device/m3-1-rom-mpy/ed25519.pub'
-      - 'm3-device/m3-1-rom-mpy/device-cert.sha256'
-      - 'script/sync_m3_trust_material.py'
   workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: workspace
 
 jobs:
   sync-and-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: joyanhui/lot-aio
+          ref: main
+          token: ${{ secrets.TOKEN_GH }}
+          path: workspace
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -31,3 +36,15 @@ jobs:
         run: |
           test "$(wc -c < m3-device/m3-1-rom-mpy/ed25519.pub)" -eq 65
           test "$(wc -c < m3-device/m3-1-rom-mpy/device-cert.sha256)" -eq 65
+      - name: Publish trust material artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-trust-material
+          path: |
+            workspace/m3-device/m3-1-rom-mpy/ed25519.pub
+            workspace/m3-device/m3-1-rom-mpy/device-cert.sha256
+          if-no-files-found: error
+      - name: Report trust material drift
+        run: |
+          git status --short m3-device/m3-1-rom-mpy/ed25519.pub m3-device/m3-1-rom-mpy/device-cert.sha256
+          git diff --exit-code m3-device/m3-1-rom-mpy/ed25519.pub m3-device/m3-1-rom-mpy/device-cert.sha256
