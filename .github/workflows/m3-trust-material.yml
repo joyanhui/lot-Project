@@ -22,11 +22,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Fetch pinned device signing public key
-        env:
-          CF_AIO_API_KEY: ${{ secrets.CF_AIO_API_KEY }}
-          M3_SIGNING_PUBLIC_KEY_SHA256: ${{ vars.M3_SIGNING_PUBLIC_KEY_SHA256 }}
-          M3_SIGNING_KEY_IDENTIFIER: ${{ vars.M3_SIGNING_KEY_IDENTIFIER }}
+      - name: Sync device signing public key from cf-aio
         run: python3 script/sync_m3_trust_material.py
       - name: Verify generated files
         run: |
