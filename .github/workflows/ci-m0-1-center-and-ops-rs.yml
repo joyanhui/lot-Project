@@ -87,3 +87,9 @@ jobs:
           cargo check -p m0-1-center-and-ops-rs
           cargo build -p m0-1-center-and-ops-rs
           ./target/debug/m0-1-center-and-ops-rs --config-check
+          if env -u LOT_CFG_DIR ./target/debug/m0-1-center-and-ops-rs --config-check >/dev/null 2>&1; then echo "missing LOT_CFG_DIR must fail"; exit 1; fi
+          if LOT_CFG_DIR="" ./target/debug/m0-1-center-and-ops-rs --config-check >/dev/null 2>&1; then echo "empty LOT_CFG_DIR must fail"; exit 1; fi
+          if LOT_CFG_DIR=/tmp/lot-cfg-absent ./target/debug/m0-1-center-and-ops-rs --config-check >/dev/null 2>&1; then echo "missing config file must fail"; exit 1; fi
+          mkdir -p /tmp/lot-cfg-invalid
+          printf 'return { unknown_module = 1 }\n' > /tmp/lot-cfg-invalid/cfg.lot.v3.lua
+          if LOT_CFG_DIR=/tmp/lot-cfg-invalid ./target/debug/m0-1-center-and-ops-rs --config-check >/dev/null 2>&1; then echo "invalid config must fail"; exit 1; fi

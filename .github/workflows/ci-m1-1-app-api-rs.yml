@@ -86,6 +86,12 @@ jobs:
           export LOT_CFG_DIR=/tmp/lot-cfg
           cargo build -p m1-1-app-api-rs
           ./target/debug/m1-1-app-api-rs --config-check
+          if env -u LOT_CFG_DIR ./target/debug/m1-1-app-api-rs --config-check >/dev/null 2>&1; then echo "missing LOT_CFG_DIR must fail"; exit 1; fi
+          if LOT_CFG_DIR="" ./target/debug/m1-1-app-api-rs --config-check >/dev/null 2>&1; then echo "empty LOT_CFG_DIR must fail"; exit 1; fi
+          if LOT_CFG_DIR=/tmp/lot-cfg-absent ./target/debug/m1-1-app-api-rs --config-check >/dev/null 2>&1; then echo "missing config file must fail"; exit 1; fi
+          mkdir -p /tmp/lot-cfg-invalid
+          printf 'return { unknown_module = 1 }\n' > /tmp/lot-cfg-invalid/cfg.lot.v3.lua
+          if LOT_CFG_DIR=/tmp/lot-cfg-invalid ./target/debug/m1-1-app-api-rs --config-check >/dev/null 2>&1; then echo "invalid config must fail"; exit 1; fi
 
       - name: Check generated OpenAPI / error-code artifacts
         working-directory: workspace
