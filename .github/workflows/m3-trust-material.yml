@@ -2,6 +2,12 @@ name: M3 trust material
 
 on:
   workflow_call:
+  pull_request:
+    paths:
+      - 'm3-device/m3-1-rom-mpy/ed25519.pub'
+      - 'm3-device/m3-1-rom-mpy/device-cert.sha256'
+      - 'script/sync_m3_trust_material.py'
+  workflow_dispatch:
 
 jobs:
   sync-and-check:
