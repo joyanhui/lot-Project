@@ -129,8 +129,8 @@ jobs:
           Common_Database_Url: "postgres://postgres:postgres@127.0.0.1:5432/m1_1_platform"
         run: |
           set -euo pipefail
-          nix develop --command bash -c "cargo build --release -p lot-manager-migration"
-          ./target/release/migrate up
+          python3 -m pip install --quiet "psycopg[binary]"
+          python3 script/migrate.py up
 
       - name: Prepare test users and tokens
         working-directory: workspace
