@@ -88,18 +88,13 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v30
 
-      - name: Sync M3 trust material before build
+      - name: Sync M3 device signing public key before build
         working-directory: workspace
         env:
           CF_AIO_API_KEY: ${{ secrets.CF_AIO_API_KEY }}
           M3_SIGNING_PUBLIC_KEY_SHA256: ${{ vars.M3_SIGNING_PUBLIC_KEY_SHA256 }}
-          M3_DEVICE_CERT_SHA256: ${{ vars.M3_DEVICE_CERT_SHA256 }}
           M3_SIGNING_KEY_IDENTIFIER: ${{ vars.M3_SIGNING_KEY_IDENTIFIER }}
-          M3_DEVICE_CERT_IDENTIFIER: ${{ vars.M3_DEVICE_CERT_IDENTIFIER }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y openssl
-          python3 script/sync_m3_trust_material.py
+        run: python3 script/sync_m3_trust_material.py
 
       - name: Build via dev.py build:all
         working-directory: workspace
