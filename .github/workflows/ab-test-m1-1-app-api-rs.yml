@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: nix develop --command bash -c "cargo build --release"
 
-      - name: Apply database migrations
+      - name: Apply database schema (migration/V*.sql)
         working-directory: workspace
         shell: bash
         env:
