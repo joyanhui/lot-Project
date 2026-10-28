@@ -30,8 +30,8 @@
 ## 构建方式
 
 - x86_64 job：`script/dev.py build:all`，Rust 服务端 native glibc 构建（CI 用 runner 系统 gcc，兼容 Debian），产出 `dist/linux_x86.tar.zst`。
-- arm64 job：`script/dev.py build:all arm64`，Rust 服务端经 `cargo-zigbuild`（zig）交叉编译为静态 musl 二进制，产出 `dist/linux_arm64.tar.zst`。
-- 两个 linux job 在 `build:all` 之后继续构建并推送 Docker 镜像到私有 ghcr `ghcr.io/joyanhui/lot-aio`：arm64 先 `docker/setup-qemu-action`，统一 `docker/setup-buildx-action`，`docker login ghcr.io`（`TOKEN_GH`）后 `nix develop` 调用 `script/dev.py build:dockerimage <arch>`（`LOT_IMAGE_PUSH=1`，镜像内二进制为 musl 静态，基础镜像 `debian:trixie-slim`）；`merge-image` job 把两个平台 tag 合并为 `:<release_tag>` 多平台清单，仅正式 tag 追加 `latest`，并强制包可见性为 private。
+- arm64 job：`script/dev.py build:all arm64`，Rust 服务端经 `cargo-zigbuild`（zig）交叉编译为 glibc 动态二进制，产出 `dist/linux_arm64.tar.zst`。
+- 两个 linux job 在 `build:all` 之后继续构建并推送 Docker 镜像到私有 ghcr `ghcr.io/joyanhui/lot-aio`：arm64 先 `docker/setup-qemu-action`，统一 `docker/setup-buildx-action`，`docker login ghcr.io`（`TOKEN_GH`）后 `nix develop` 调用 `script/dev.py build:dockerimage <arch>`（`LOT_IMAGE_PUSH=1`，镜像内二进制为 glibc 动态构建，基础镜像 `debian:trixie-slim`）；`merge-image` job 把两个平台 tag 合并为 `:<release_tag>` 多平台清单，仅正式 tag 追加 `latest`，并强制包可见性为 private。
 - iOS job（macos）：构建无签名 iOS Simulator `.app`，压缩为 `.app.ipa`（zip 格式，非真机可安装 IPA）。
 
 ## 发布资产
