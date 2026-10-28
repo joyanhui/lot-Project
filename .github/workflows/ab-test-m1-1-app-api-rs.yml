@@ -77,7 +77,7 @@ jobs:
         image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: m1_1_platform
+          POSTGRES_DB: lot
         ports:
           - 5432:5432
         options: >-
@@ -126,7 +126,7 @@ jobs:
         working-directory: workspace
         shell: bash
         env:
-          Common_Database_Url: "postgres://postgres:postgres@127.0.0.1:5432/m1_1_platform"
+          Common_Database_Url: "postgres://postgres:postgres@127.0.0.1:5432/lot"
         run: |
           set -euo pipefail
           python3 -m pip install --quiet "psycopg[binary]"
@@ -139,7 +139,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/loadtest
           python3 ab-test/m1-1-app-api-rs/online-20k/prep.py
-          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d m1_1_platform -f /tmp/loadtest/insert_users.sql
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d lot -f /tmp/loadtest/insert_users.sql
 
       - name: Stage Lua config directory
         working-directory: workspace
